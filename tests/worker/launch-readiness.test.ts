@@ -18,7 +18,6 @@ describe("launch readiness regressions", { concurrent: false }, () => {
         vars: { APP_ENV: "production", AUTH_BASE_URL: origin },
         secrets: {
           BETTER_AUTH_SECRET: secret,
-          RESEND_API_KEY: "test-only-key",
         },
       },
     ],

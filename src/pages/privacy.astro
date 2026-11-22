@@ -193,36 +193,38 @@ const account = await loadAccountNavigation(
         Canada.
       </p>
       <p class="mt-6">
-        On our Workers Free plan, Cloudflare provides seven days of D1 recovery
-        history. Its documented retention is three days for stored Workers logs
-        and seven days for stored traces. These windows do not set how long our
-        application keeps profiles, application drafts, or audit records, and do
-        not describe every category of provider security or account record.
+        On our Workers Paid plan, Cloudflare provides 30 days of D1 recovery
+        history. Its documented retention is seven days for stored Workers logs
+        and traces. These windows do not set how long our application keeps
+        profiles, application drafts, or audit records, and do not describe
+        every category of provider security or account record.
       </p>
       <p class="mt-6">
-        Hosted sign-in and email-change messages use Resend, which receives the
-        recipient address and message content, including the verification code
-        and, for sign-in, a sign-in link. Event, role, and access-change emails
-        also use Resend when an organizer chooses to send them. Their content
-        can include event details, access status, and an organizer-entered
-        reason. Production medic-certification reminders include the expiry date
-        listed in the profile. Notification content and delivery records are
-        also stored in D1. Do not put sensitive answers in emailed reasons.
+        Hosted sign-in and email-change messages use Cloudflare Email Service,
+        which receives the recipient address and message content, including the
+        verification code and, for sign-in, a sign-in link. Event, role, and
+        access-change emails also use it when an organizer chooses to send them.
+        Their content can include event details, access status, and an
+        organizer-entered reason. Production medic-certification reminders
+        include the expiry date listed in the profile. Notification content and
+        delivery records are also stored in D1. Do not put sensitive answers in
+        emailed reasons.
       </p>
       <p class="mt-6">
-        We use Resend Free. Resend states that customer data is stored in the
-        United States, email and log data is retained for 30 days, and backups
-        persist for seven days. Open and click tracking are disabled for our
-        sending domain. Earlier deletion of a specific message can be requested
-        through Resend support. Provider retention does not remove copies
-        already delivered to recipients’ inboxes.
+        Cloudflare keeps a copy of each sent message, including any sign-in code
+        or link, for about seven days so we can check delivery problems. It also
+        keeps an activity log of each message’s sender, recipient, subject, and
+        delivery status, and sending metrics for 31 days. Cloudflare does not
+        publish how long the activity log is kept or where Email Service data is
+        stored. Provider retention does not remove copies already delivered to
+        recipients’ inboxes.
       </p>
       <p class="mt-6">
         When your application is ready for review, organizers receive an email
         with your display name (preferred first name or first name, plus last
         initial), submission time, and a link to review it after signing in.
-        This email uses Resend and does not include your other application
-        answers.
+        This email uses Cloudflare Email Service and does not include your other
+        application answers.
       </p>
       <p class="mt-6">
         Discord authorization requests only identity and permission to join our

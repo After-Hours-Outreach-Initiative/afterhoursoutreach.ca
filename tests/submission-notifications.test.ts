@@ -29,6 +29,7 @@ import {
   runSubmissionNotificationJob,
 } from "../src/server/submission-notifications";
 import { sourceSchemaStatements } from "./helpers/source-schema";
+import { emailError, emailSender } from "./helpers/email-sender";
 import { deliverNotifications } from "../src/server/events/notifications";
 import { processMedicCertificationNotifications } from "../src/server/medic-certifications";
 import { addCalendarDays, vancouverInput } from "../src/data/event-time";
@@ -70,7 +71,7 @@ const bindings = (APP_ENV = "production"): AuthBindings => ({
   APP_ENV,
   AUTH_BASE_URL: "https://afterhoursoutreach.ca",
   BETTER_AUTH_SECRET: secret,
-  RESEND_API_KEY: "test-only-key",
+  EMAIL: emailSender(),
 });
 const answers = {
   firstName: "Sample",
@@ -165,11 +166,9 @@ async function budgetCount(now = Date.now()) {
 const ready = () =>
   db
     .prepare(
-      "UPDATE application_submission_notification SET next_attempt_at=0,lease_until=NULL WHERE status IN ('pending','sending')",
+      "UPDATE application_submission_notification SET next_attempt_at=0,lease_until=CASE WHEN status='sending' THEN 0 END WHERE status IN ('pending','sending')",
     )
     .run();
-const accepted: typeof fetch = async () =>
-  Response.json({ id: "accepted-provider-id" });
 
 beforeAll(async () => {
   await harness.listen();
@@ -264,9 +263,9 @@ test("form submission is silent; only the winning review transition records priv
   ]);
   assert.equal(result.filter((saved) => saved.firstSubmitted).length, 1);
   assert.equal(await count("application_submission_notification"), 0);
-  const provider = vi.fn(accepted);
+  const provider = emailSender();
   await deliverSubmissionNotifications(bindings(), {}, provider);
-  assert.equal(provider.mock.calls.length, 0);
+  assert.equal(provider.send.mock.calls.length, 0);
   const confirmations = await Promise.all([confirm(), confirm()]);
   assert.equal(confirmations.filter((row) => row.reviewOperationId).length, 1);
   const winner = confirmations.find((row) => row.reviewOperationId)!;
@@ -430,7 +429,7 @@ test("legacy initial-form intents are suppressed, never backfilled or replaced a
       )
       .run();
   }
-  const provider = vi.fn(accepted);
+  const provider = emailSender();
   // Even direct claims cannot revive old initial-form mail.
   assert.equal(
     await claimSubmissionNotification(
@@ -454,7 +453,7 @@ test("legacy initial-form intents are suppressed, never backfilled or replaced a
   await db.prepare("DELETE FROM application_submission_notification").run();
   assert.equal((await confirm()).reviewOperationId, undefined);
   assert.deepEqual(await rows(), []);
-  assert.equal(provider.mock.calls.length, 0);
+  assert.equal(provider.send.mock.calls.length, 0);
   assert.equal(await budgetCount(), 0);
 });
 
@@ -469,23 +468,12 @@ test("production acceptance is per-recipient, bounded, duplicate-safe under conc
       "Do not send",
     ),
   ]);
-  const provider = vi.fn<typeof fetch>(async (url, init) => {
-    assert.equal(url, "https://api.resend.com/emails");
-    assert.equal(init?.method, "POST");
-    assert.equal(
-      JSON.parse(String(init?.body)).from,
-      "After Hours Outreach <info@afterhoursoutreach.ca>",
-    );
-    assert.equal(
-      new Headers(init?.headers).get("User-Agent"),
-      "afterhoursoutreach.ca/1.0",
-    );
-    assert.match(
-      new Headers(init?.headers).get("Idempotency-Key")!,
-      /^application-submission\//,
-    );
-    assert.ok(init?.signal);
-    return accepted(url, init);
+  const provider = emailSender((message) => {
+    assert.deepEqual(message.from, {
+      name: "After Hours Outreach",
+      email: "info@afterhoursoutreach.ca",
+    });
+    assert.equal((message.to as string[]).length, 1);
   });
   await Promise.all([
     deliverSubmissionNotifications(
@@ -499,14 +487,10 @@ test("production acceptance is per-recipient, bounded, duplicate-safe under conc
       provider,
     ),
   ]);
-  assert.equal(provider.mock.calls.length, 3);
-  assert.equal(
-    new Set(
-      provider.mock.calls.map(([, init]) =>
-        new Headers(init?.headers).get("Idempotency-Key"),
-      ),
-    ).size,
-    3,
+  assert.equal(provider.send.mock.calls.length, 3);
+  assert.deepEqual(
+    provider.messages.map((message) => message.to).sort(),
+    submissionNotificationRecipients.map((recipient) => [recipient]),
   );
   assert.equal(await budgetCount(), 3);
   assert.deepEqual(
@@ -520,20 +504,18 @@ test("production acceptance is per-recipient, bounded, duplicate-safe under conc
     0,
   );
   await deliverSubmissionNotifications(bindings(), {}, provider);
-  assert.equal(provider.mock.calls.length, 3);
+  assert.equal(provider.send.mock.calls.length, 3);
 });
 
-test("partial recipient failures replay only unfinished frozen requests/keys, without same-day quota charges", async () => {
+test("a rejected recipient retries its frozen request without a same-day charge; an unclear one is never retried", async () => {
   await submit();
   const original = await rows();
-  const failedIds = new Set(original.slice(1).map((row) => row.id));
-  const initial = vi.fn<typeof fetch>(async (_url, init) => {
-    const id = new Headers(init?.headers).get("Idempotency-Key")!.split("/")[1];
-    if (id === original[1].id)
-      throw new Error("private provider timeout with private address");
-    if (id === original[2].id)
-      return new Response("Private provider failure", { status: 503 });
-    return Response.json({ id: "accepted" });
+  const initial = emailSender((message) => {
+    const [to] = message.to as string[];
+    if (to === original[1].recipient)
+      throw emailError("E_INTERNAL_SERVER_ERROR");
+    if (to === original[2].recipient)
+      throw emailError("E_EMAIL_SENDING_NOT_READY");
   });
   const result = await deliverSubmissionNotifications(bindings(), {}, initial);
   assert.equal("sent" in result && result.sent, 1);
@@ -541,41 +523,39 @@ test("partial recipient failures replay only unfinished frozen requests/keys, wi
   assert.equal(await budgetCount(), 3);
   assert.deepEqual(
     (await rows()).map((row) => row.status),
-    ["sent", "pending", "pending"],
+    ["sent", "expired", "pending"],
   );
   assert.deepEqual(
     (await rows()).map((row) => row.outcome),
-    [null, "unconfirmed", "unconfirmed"],
+    [null, "unconfirmed", "failed"],
   );
-  const noEarly = vi.fn(accepted);
+  const noEarly = emailSender();
   await deliverSubmissionNotifications(bindings(), {}, noEarly);
-  assert.equal(noEarly.mock.calls.length, 0); // Backoff is durable, not a tight loop.
+  assert.equal(noEarly.send.mock.calls.length, 0); // Backoff is durable, not a tight loop.
   await ready();
-  const retry = vi.fn(accepted);
+  const retry = emailSender();
   await deliverSubmissionNotifications(
     { ...bindings(), AUTH_BASE_URL: "https://changed.example.org" },
     {},
     retry,
   );
-  assert.equal(retry.mock.calls.length, 2);
-  for (const [, init] of retry.mock.calls) {
-    const key = new Headers(init?.headers).get("Idempotency-Key")!;
-    assert.ok(failedIds.has(key.split("/")[1]));
-    const first = initial.mock.calls.find(
-      ([, sent]) => new Headers(sent?.headers).get("Idempotency-Key") === key,
-    )!;
-    assert.equal(init?.body, first[1]?.body);
-  }
+  assert.equal(retry.send.mock.calls.length, 1);
+  assert.deepEqual(
+    retry.send.mock.calls[0][0],
+    initial.send.mock.calls.find(
+      ([message]) => (message.to as string[])[0] === original[2].recipient,
+    )![0],
+  );
   assert.equal(await budgetCount(), 3);
   assert.deepEqual(
     (await rows()).map((row) => row.status),
-    ["sent", "sent", "sent"],
+    ["sent", "expired", "sent"],
   );
 });
 
-test("accepted mail with a failed ledger write recovers through the same leased request and stale workers cannot finish it", async () => {
+test("accepted mail with a failed ledger write is never resent and stale workers cannot finish it", async () => {
   await submit();
-  const provider = vi.fn(accepted);
+  const provider = emailSender();
   await db
     .prepare(
       `CREATE TRIGGER reject_sent_ledger BEFORE UPDATE OF status ON application_submission_notification
@@ -590,16 +570,21 @@ test("accepted mail with a failed ledger write recovers through the same leased 
   const leased = (await rows()).find((row) => row.status === "sending")!;
   assert.ok(leased.first_attempt_at);
   await deliverSubmissionNotifications(bindings(), { limit: 3 }, provider);
-  assert.equal(provider.mock.calls.length, 3); // Other two recipients may proceed, not the live lease.
+  assert.equal(provider.send.mock.calls.length, 3); // Other two recipients may proceed, not the live lease.
   await ready();
-  const claimed = await claimSubmissionNotification(
-    db,
-    leased.id,
-    "production",
-    "new-owner",
-    Date.now(),
+  assert.equal(
+    await claimSubmissionNotification(
+      db,
+      leased.id,
+      "production",
+      "new-owner",
+      Date.now(),
+    ),
+    null,
   );
-  assert.ok(claimed);
+  const result = await deliverSubmissionNotifications(bindings(), {}, provider);
+  assert.equal("expired" in result && result.expired, 1);
+  assert.equal(provider.send.mock.calls.length, 3);
   await finishSubmissionNotification(
     db,
     leased.id,
@@ -608,57 +593,41 @@ test("accepted mail with a failed ledger write recovers through the same leased 
     Date.now(),
     0,
   );
-  assert.equal(
-    (await rows()).find((row) => row.id === leased.id)!.lease_token,
-    "new-owner",
-  );
-  await finishSubmissionNotification(
-    db,
-    leased.id,
-    "new-owner",
-    "unconfirmed",
-    Date.now(),
-    0,
-  );
-  await deliverSubmissionNotifications(bindings(), {}, provider);
-  assert.equal(provider.mock.calls.length, 4);
-  assert.equal(
-    provider.mock.calls[0][1]?.body,
-    provider.mock.calls[3][1]?.body,
-  );
-  assert.equal(
-    new Headers(provider.mock.calls[0][1]?.headers).get("Idempotency-Key"),
-    new Headers(provider.mock.calls[3][1]?.headers).get("Idempotency-Key"),
-  );
+  const expired = (await rows()).find((row) => row.id === leased.id)!;
+  assert.equal(expired.status, "expired");
+  assert.equal(expired.outcome, "unconfirmed");
   assert.equal(await budgetCount(), 3);
 });
 
 test("exhausted shared budget preserves unattempted intents, and concurrent reservations never overdraw", async () => {
   await submit();
   await takeEmailBudget(db, secret, emailPolicy.dailyLimit);
-  const provider = vi.fn(accepted);
+  const provider = emailSender();
   const result = await deliverSubmissionNotifications(bindings(), {}, provider);
   assert.equal("limited" in result && result.limited, true);
-  assert.equal(provider.mock.calls.length, 0);
+  assert.equal(provider.send.mock.calls.length, 0);
   for (const row of await rows()) {
     assert.equal(row.first_attempt_at, null);
     assert.equal(row.attempts, 0);
     assert.equal(row.budget_window, null);
   }
-  assert.equal(await budgetCount(), 80);
+  assert.equal(await budgetCount(), emailPolicy.dailyLimit);
   // Scratch counter only: leave one daily email available, then race claims.
-  await db.prepare("UPDATE auth_rate_limit SET count=79").run();
+  await db
+    .prepare("UPDATE auth_rate_limit SET count=?")
+    .bind(emailPolicy.dailyLimit - 1)
+    .run();
   await ready();
   await Promise.all([
     deliverSubmissionNotifications(bindings(), {}, provider),
     deliverSubmissionNotifications(bindings(), {}, provider),
   ]);
-  assert.equal(provider.mock.calls.length, 1);
-  assert.equal(await budgetCount(), 80);
+  assert.equal(provider.send.mock.calls.length, 1);
+  assert.equal(await budgetCount(), emailPolicy.dailyLimit);
   assert.equal((await rows()).filter((row) => row.status === "sent").length, 1);
 });
 
-test("submission, event and medic delivery race within the same 80-email budget; a Preview build cannot run medic delivery", async () => {
+test("submission, event and medic delivery race within the same daily budget; a Preview build cannot run medic delivery", async () => {
   await submit();
   await db.batch([
     queueNotification(
@@ -677,31 +646,24 @@ test("submission, event and medic delivery race within the same 80-email budget;
         actor.id,
       ),
   ]);
-  await takeEmailBudget(db, secret, 78);
-  let emails = 0;
-  const provider: typeof fetch = async (_url, init) => {
-    const payload = JSON.parse(String(init?.body));
-    emails += Array.isArray(payload) ? payload.length : 1;
-    return Array.isArray(payload)
-      ? Response.json({ data: payload.map(() => ({ id: "accepted" })) })
-      : Response.json({ id: "accepted" });
-  };
+  await takeEmailBudget(db, secret, emailPolicy.dailyLimit - 2);
+  const provider = emailSender();
   await Promise.all([
     deliverSubmissionNotifications(bindings(), {}, provider),
     deliverNotifications(bindings(), "shared-budget-event", provider),
     processMedicCertificationNotifications(bindings(), true, provider),
   ]);
-  assert.equal(await budgetCount(), 80);
-  assert.equal(emails, 2);
+  assert.equal(await budgetCount(), emailPolicy.dailyLimit);
+  assert.equal(provider.send.mock.calls.length, 2);
   vi.stubEnv("MODE", "preview");
   assert.deepEqual(
     await processMedicCertificationNotifications(bindings(), true, provider),
     { skipped: true },
   );
-  assert.equal(emails, 2);
+  assert.equal(provider.send.mock.calls.length, 2);
 });
 
-test("budget reservation and outbox mark are one D1 transaction; rollover reserves again but retains key/clock", async () => {
+test("budget reservation and outbox mark are one D1 transaction; a rejected retry after rollover reserves again but keeps its payload and clock", async () => {
   await submit();
   const row = (await rows())[0];
   const day = emailPolicy.budgetWindowMs;
@@ -731,14 +693,7 @@ test("budget reservation and outbox mark are one D1 transaction; rollover reserv
   ))!;
   assert.equal(first.attempts, 1);
   assert.equal(await budgetCount(now), 1);
-  await finishSubmissionNotification(
-    db,
-    row.id,
-    "owner",
-    "unconfirmed",
-    now,
-    now,
-  );
+  await finishSubmissionNotification(db, row.id, "owner", "failed", now, now);
   const tomorrow = now + 2 * 3_600_000;
   assert.ok(
     await claimSubmissionNotification(
@@ -761,74 +716,72 @@ test("budget reservation and outbox mark are one D1 transaction; rollover reserv
   assert.equal(replay.first_attempt_at, now);
 });
 
-test("ambiguous attempts expire before Resend's key lifetime; unattempted old mail stays deliverable", async () => {
+test("rejected attempts stop retrying after the retry window; unattempted old mail stays deliverable", async () => {
   await submit();
   const original = await rows();
   const old = Date.now() - submissionRetryWindowMs - 1;
   await db
     .prepare(
-      "UPDATE application_submission_notification SET first_attempt_at=?,attempts=1,outcome='unconfirmed' WHERE id=?",
+      "UPDATE application_submission_notification SET first_attempt_at=?,attempts=1,outcome='failed' WHERE id=?",
     )
     .bind(old, original[0].id)
     .run();
-  const provider = vi.fn(accepted);
+  const provider = emailSender();
   await deliverSubmissionNotifications(bindings(), {}, provider);
-  assert.equal(provider.mock.calls.length, 2);
+  assert.equal(provider.send.mock.calls.length, 2);
   assert.equal((await rows())[0].status, "expired");
   await ready();
   await deliverSubmissionNotifications(bindings(), {}, provider);
-  assert.equal(provider.mock.calls.length, 2); // Never mint a new key, even the next day.
+  assert.equal(provider.send.mock.calls.length, 2); // Not even the next day.
 });
 
-test("provider 429 honors Retry-After and stops this run; 409 and 5xx remain unconfirmed", async () => {
+test("a provider limit stops this run and backs off; unclear sends are never retried", async () => {
   await submit();
-  const provider = vi.fn<typeof fetch>(
-    async () =>
-      new Response("Private error", {
-        status: 429,
-        headers: { "Retry-After": "7200" },
-      }),
-  );
+  const provider = emailSender(() => {
+    throw emailError("E_RATE_LIMIT_EXCEEDED");
+  });
   const now = Date.now();
   await deliverSubmissionNotifications(bindings(), {}, provider);
-  assert.equal(provider.mock.calls.length, 1);
+  assert.equal(provider.send.mock.calls.length, 1);
   const attempted = (await rows()).find((row) => row.attempts)!;
+  assert.equal(attempted.status, "pending");
   assert.equal(attempted.outcome, "failed");
-  assert.ok(attempted.next_attempt_at >= now + 7_200_000);
+  assert.ok(attempted.next_attempt_at >= now + 5 * 60_000);
   await ready();
-  await deliverSubmissionNotifications(
-    bindings(),
-    {},
-    async () => new Response("private conflict", { status: 409 }),
+  const unclear = emailSender(() => {
+    throw emailError("E_INTERNAL_SERVER_ERROR");
+  });
+  await deliverSubmissionNotifications(bindings(), {}, unclear);
+  assert.equal(unclear.send.mock.calls.length, 3);
+  assert.ok(
+    (await rows()).every(
+      (row) => row.status === "expired" && row.outcome === "unconfirmed",
+    ),
   );
-  assert.ok((await rows()).every((row) => row.outcome === "unconfirmed"));
   await ready();
-  await deliverSubmissionNotifications(
-    bindings(),
-    {},
-    async () => new Response("private rejection", { status: 422 }),
-  );
-  assert.ok((await rows()).every((row) => row.outcome === "unconfirmed"));
+  const retry = emailSender();
+  await deliverSubmissionNotifications(bindings(), {}, retry);
+  assert.equal(retry.send.mock.calls.length, 0);
 });
 
 test("local simulation is durable and quota-free, with no production outbox consumption", async () => {
   await submit(bindings("local"));
-  const provider = vi.fn(accepted);
+  const provider = emailSender();
   const simulated = await deliverSubmissionNotifications(
     bindings("local"),
     {},
     provider,
   );
   assert.equal("simulated" in simulated && simulated.simulated, 3);
-  assert.equal(provider.mock.calls.length, 0);
+  assert.equal(provider.send.mock.calls.length, 0);
   assert.equal(await budgetCount(), 0);
   assert.ok((await rows()).every((row) => row.status === "local"));
   await deliverSubmissionNotifications(bindings(), {}, provider);
-  assert.equal(provider.mock.calls.length, 0);
+  assert.equal(provider.send.mock.calls.length, 0);
 });
 
 test("preview runtime/build gates suppress real organizer mail, even with production keys/bindings or shared DB", async () => {
-  const provider = vi.fn(accepted);
+  const provider = emailSender();
   await submit(bindings("preview"));
   assert.ok(
     (await rows()).every(
@@ -840,11 +793,11 @@ test("preview runtime/build gates suppress real organizer mail, even with produc
   );
   await deliverSubmissionNotifications(bindings("preview"), {}, provider);
   await deliverSubmissionNotifications(bindings(), {}, provider);
-  assert.equal(provider.mock.calls.length, 0);
+  assert.equal(provider.send.mock.calls.length, 0);
   vi.stubEnv("MODE", "preview");
   assert.equal(submissionNotificationMode(bindings()), "preview");
   await deliverSubmissionNotifications(bindings(), {}, provider);
-  assert.equal(provider.mock.calls.length, 0);
+  assert.equal(provider.send.mock.calls.length, 0);
   vi.stubEnv("MODE", "production");
   vi.stubEnv("DEV", true);
   assert.equal(submissionNotificationMode(bindings()), "local");
@@ -855,13 +808,12 @@ test("preview runtime/build gates suppress real organizer mail, even with produc
 
 test("preview and local drains never consume an existing production intent; missing secrets do not start attempts", async () => {
   await submit();
-  const provider = vi.fn(accepted);
+  const provider = emailSender();
   await deliverSubmissionNotifications(bindings("preview"), {}, provider);
   await deliverSubmissionNotifications(bindings("local"), {}, provider);
   await deliverSubmissionNotifications(
-    { ...bindings(), RESEND_API_KEY: "" },
+    { ...bindings(), EMAIL: undefined as unknown as SendEmail },
     {},
-    provider,
   );
   await deliverSubmissionNotifications(
     { ...bindings(), BETTER_AUTH_SECRET: "" },
@@ -870,7 +822,7 @@ test("preview and local drains never consume an existing production intent; miss
   );
   vi.stubEnv("MODE", "preview");
   await deliverSubmissionNotifications(bindings(), {}, provider);
-  assert.equal(provider.mock.calls.length, 0);
+  assert.equal(provider.send.mock.calls.length, 0);
   assert.ok(
     (await rows()).every(
       (row) => row.status === "pending" && row.first_attempt_at === null,
@@ -892,22 +844,22 @@ test("a preview build suppresses intent creation even with production bindings",
   );
   // A later production build against that same database cannot promote them.
   vi.stubEnv("MODE", "production");
-  const provider = vi.fn(accepted);
+  const provider = emailSender();
   await deliverSubmissionNotifications(bindings(), {}, provider);
-  assert.equal(provider.mock.calls.length, 0);
+  assert.equal(provider.send.mock.calls.length, 0);
 });
 
 test("development simulates despite production binding defaults and never spends quota", async () => {
   vi.stubEnv("DEV", true);
   await submit(bindings());
-  const provider = vi.fn(accepted);
+  const provider = emailSender();
   await deliverSubmissionNotifications(bindings(), {}, provider);
   assert.ok(
     (await rows()).every(
       (row) => row.mode === "local" && row.status === "local",
     ),
   );
-  assert.equal(provider.mock.calls.length, 0);
+  assert.equal(provider.send.mock.calls.length, 0);
   assert.equal(await budgetCount(), 0);
 });
 
@@ -918,9 +870,9 @@ test("unattempted intents remain deliverable days after submission and start the
     .mockReturnValue(realNow - 3 * emailPolicy.budgetWindowMs);
   await submit();
   clock.mockRestore();
-  const provider = vi.fn(accepted);
+  const provider = emailSender();
   await deliverSubmissionNotifications(bindings(), {}, provider);
-  assert.equal(provider.mock.calls.length, 3);
+  assert.equal(provider.send.mock.calls.length, 3);
   assert.ok(
     (await rows()).every(
       (row) => row.status === "sent" && row.first_attempt_at! >= realNow,
@@ -983,9 +935,9 @@ test("opting out suppresses queued review mail before delivery", async () => {
       "UPDATE user SET application_review_emails=0 WHERE id='reviewer-0'",
     )
     .run();
-  const provider = vi.fn(accepted);
+  const provider = emailSender();
   await deliverSubmissionNotifications(bindings(), {}, provider);
-  assert.equal(provider.mock.calls.length, 2);
+  assert.equal(provider.send.mock.calls.length, 2);
   assert.equal(
     (await rows()).find(
       (row) => row.recipient === submissionNotificationRecipients[0],

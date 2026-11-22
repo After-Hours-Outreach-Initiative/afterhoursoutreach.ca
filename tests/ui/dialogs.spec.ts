@@ -426,6 +426,12 @@ test("event cancellation morphs in place and preserves its draft after failure",
     await expect(
       dialog.getByRole("button", { name: "Cancel event", exact: true }),
     ).toBeFocused();
+    // Under load the collapse can still be running; let it settle first.
+    await morph.locator(".cancellation-surface").evaluate(async (surface) => {
+      await Promise.allSettled(
+        surface.getAnimations().map((animation) => animation.finished),
+      );
+    });
     await page.keyboard.press("Escape");
     await expect(dialog).toBeHidden();
   }

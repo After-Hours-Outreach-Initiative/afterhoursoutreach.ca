@@ -89,7 +89,9 @@ Production pins this to `https://afterhoursoutreach.ca`; previews leave it empty
 to use their own URL. Forwarded-host headers are never used. Account pages keep
 their CSP, no-store, and noindex protections in all deployed builds; public
 production pages can be indexed and cached.
-Account secrets: `BETTER_AUTH_SECRET`, `RESEND_API_KEY`.
+Account secret: `BETTER_AUTH_SECRET`. Email uses the `EMAIL` send binding, which
+needs Email Sending enabled for the domain. Previews have no binding and show
+sign-in emails on screen.
 Discord additionally needs private client/bot/encryption secrets and the server
 and three role IDs documented in [Discord setup](/implementation/discord/#dedicated-bot-and-server-setup).
 Blank IDs disable Discord without affecting email sign-in; configure before

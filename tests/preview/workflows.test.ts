@@ -19,7 +19,7 @@ test("built Preview walkthrough: submission suppression, conflicts, approval que
         // Deliberately wrong runtime mode: the Preview build must still suppress
         // organizer mail. Never supply a real provider key to this local harness.
         vars: { APP_ENV: "production", AUTH_BASE_URL: "" },
-        secrets: { BETTER_AUTH_SECRET: secret, RESEND_API_KEY: "" },
+        secrets: { BETTER_AUTH_SECRET: secret },
       },
     ],
   });
@@ -204,9 +204,37 @@ test("built Preview walkthrough: submission suppression, conflicts, approval que
     await page
       .getByRole("button", { name: "Approve and send email", exact: true })
       .click();
-    const feedback = page.locator("[data-action-email-feedback]");
-    await expect(feedback).toBeVisible();
-    await feedback.locator(".dialog-close").click();
+    // Emailing changes wait behind the undo timer; make it now, as the cron would.
+    let pending: string | null = null;
+    await expect
+      .poll(async () => {
+        pending = await DB.prepare(
+          "SELECT id FROM pending_action WHERE finished_at IS NULL",
+        ).first<string>("id");
+        return pending;
+      })
+      .toBeTruthy();
+    const run = await page.evaluate(async (id) => {
+      const response = await fetch("/api/v1/pending-actions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "run", id }),
+      });
+      return {
+        status: response.status,
+        body: (await response.json()) as {
+          status: string;
+          pending: number;
+          message: string;
+        },
+      };
+    }, pending);
+    assert.equal(run.status, 200);
+    assert.equal(run.body.status, "done");
+    // Previews have no email binding, so the approval email stays pending.
+    assert.equal(run.body.pending, 1);
+    assert.match(run.body.message, /could not be sent/);
+    await page.reload();
     await expect(
       page.getByRole("button", {
         name: "Revoke application approval",
@@ -262,7 +290,7 @@ test("built Preview walkthrough: submission suppression, conflicts, approval que
       await DB.prepare(
         "SELECT count(*) n FROM application_submission_notification",
       ).first("n"),
-      3,
+      1,
     );
     await DB.prepare(
       "UPDATE volunteer_status SET patrol_approved=1,approved_by=?,approved_at=? WHERE user_id=?",
@@ -274,8 +302,20 @@ test("built Preview walkthrough: submission suppression, conflicts, approval que
       vancouverInput(Date.now()).slice(0, 10),
       2,
     );
-    const action = (body: object, cookie = organizer.cookie) =>
-      send("/api/v1/events/action", body, cookie);
+    const action = async (body: object, cookie = organizer.cookie) => {
+      const response = await send("/api/v1/events/action", body, cookie);
+      if (response.status !== 200) return response;
+      const result = (await response.clone().json()) as {
+        pendingAction?: { id: string };
+      };
+      if (!result.pendingAction) return response;
+      // Make a change waiting on its undo timer now, as the cron would.
+      return send(
+        "/api/v1/pending-actions",
+        { action: "run", id: result.pendingAction.id },
+        cookie,
+      );
+    };
     const created = (await (
       await ok(
         await action({

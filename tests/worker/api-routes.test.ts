@@ -12,7 +12,6 @@ test("API routes use the v1 prefix and retain private headers on workers.dev", a
         vars: { APP_ENV: "production", AUTH_BASE_URL: "" },
         secrets: {
           BETTER_AUTH_SECRET: "api-routes-test-secret-12345678901234567890",
-          RESEND_API_KEY: "",
         },
       },
     ],

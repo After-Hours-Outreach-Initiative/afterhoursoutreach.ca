@@ -13,7 +13,7 @@ test("self-service deletion requires fresh, confirmed same-origin authentication
       {
         configPath: "dist/server/wrangler.json",
         vars: { APP_ENV: "production", AUTH_BASE_URL: origin },
-        secrets: { BETTER_AUTH_SECRET: secret, RESEND_API_KEY: "" },
+        secrets: { BETTER_AUTH_SECRET: secret },
       },
     ],
   });

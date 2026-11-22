@@ -714,7 +714,7 @@ export const medicCertificationNotification = sqliteTable(
     })
       .notNull()
       .default("pending"),
-    // Exact Resend request, frozen on first attempt; cleared on terminal states.
+    // Exact email request, frozen on first attempt; cleared on terminal states.
     delivery_payload: text(),
     first_attempt_at: timestamp(),
     attempts: integer().notNull().default(0),

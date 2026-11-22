@@ -5,6 +5,7 @@ import { createTestHarness } from "wrangler";
 import { createSignInOTP } from "../helpers/email-otp";
 import { seedVerifiedDiscordMembership } from "../helpers/discord";
 import { profileWriteBody } from "../helpers/profile-write";
+import { withoutEmail } from "../helpers/without-email";
 
 const origin = "https://afterhoursoutreach.ca";
 const secret = "organizer-email-test-secret-12345678901234567890";
@@ -39,9 +40,9 @@ describe(
     const server = createTestHarness({
       workers: [
         {
-          configPath: "dist/server/wrangler.json",
+          configPath: withoutEmail(),
           vars: { APP_ENV: "production", AUTH_BASE_URL: "" },
-          secrets: { BETTER_AUTH_SECRET: secret, RESEND_API_KEY: "" },
+          secrets: { BETTER_AUTH_SECRET: secret },
         },
       ],
     });

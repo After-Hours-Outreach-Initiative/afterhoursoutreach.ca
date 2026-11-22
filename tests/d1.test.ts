@@ -71,6 +71,7 @@ import {
   deleteLocalAccount,
 } from "../src/dev/server/local-accounts";
 import { completeLocalApplicationStep } from "../src/dev/server/application-steps";
+import { emailError, emailSender } from "./helpers/email-sender";
 import { resetAccountState } from "../src/dev/server/account-states";
 import { listLocalAccounts } from "../src/dev/server/account-list";
 import {
@@ -2358,14 +2359,14 @@ test("review queue loads every submitted entry and counts search matches indepen
       .awaitingApprovalCount,
     0,
   );
+  const localSender = emailSender();
   const localDelivery = await deliverNotifications(
     { ...env, APP_ENV: "local" },
     decision.operation,
-    async () => {
-      throw new Error("Local rejection must not call a provider");
-    },
+    localSender,
   );
   assert.equal(localDelivery.simulated, 1);
+  assert.equal(localSender.send.mock.calls.length, 0);
   const rejectionPayload = JSON.parse(
     (await env.DB.prepare(
       "SELECT payload FROM event_notification_batch WHERE operation_id=?",
@@ -4247,52 +4248,46 @@ test("medic reminder dates respect Vancouver midnight/DST, expiry day, 30-day wa
   );
 });
 
-test("medic mail deduplicates concurrent runs and renewals; ambiguous retries freeze payload and stop before Resend keys expire", async () => {
+test("medic mail deduplicates concurrent runs and renewals; rejected retries keep the frozen payload and unclear sends are never retried", async () => {
   const now = Date.parse("2026-10-15T16:00:00Z");
   const bindings = {
     DB: env.DB,
     APP_ENV: "production",
     AUTH_BASE_URL: "https://afterhoursoutreach.ca",
     BETTER_AUTH_SECRET: "runtime-only-medic-test-secret",
-    RESEND_API_KEY: "test-only-resend-key",
+    EMAIL: emailSender(),
   };
   await seedMedic("medic", "2026-11-14");
-  const payloads = new Map<string, string>();
-  let calls = 0;
-  let loseResponse = false;
-  const provider: typeof fetch = async (_input, init) => {
-    calls++;
-    const key = new Headers(init?.headers).get("Idempotency-Key")!;
-    const body = String(init?.body);
-    if (payloads.has(key)) assert.equal(body, payloads.get(key));
-    payloads.set(key, body); // Simulated provider accepts once for each key.
-    if (loseResponse)
-      throw new Error("Simulated response lost after acceptance");
-    return new Response(null, { status: 200 });
-  };
+  let failure: string | undefined;
+  const provider = emailSender(() => {
+    if (failure) throw emailError(failure);
+  });
+  const calls = () => provider.send.mock.calls.length;
   const run = (discover = true, time = now) =>
     processMedicCertificationNotifications(bindings, discover, provider, time);
   await Promise.all([run(), run()]);
   await run();
-  assert.equal(calls, 1);
-  assert.equal(payloads.size, 1);
-  assert.match([...payloads.values()][0], /2026-11-14/);
-  assert.equal(
-    JSON.parse([...payloads.values()][0]).from,
-    "After Hours Outreach <info@afterhoursoutreach.ca>",
-  );
+  assert.equal(calls(), 1);
+  assert.match(String(provider.messages[0].text), /2026-11-14/);
+  assert.deepEqual(provider.messages[0].from, {
+    name: "After Hours Outreach",
+    email: "info@afterhoursoutreach.ca",
+  });
 
   await env.DB.prepare(
     "UPDATE profile SET medical_certification_expiry='2026-11-13' WHERE user_id='medic'",
   ).run();
-  loseResponse = true;
-  await run();
-  assert.equal(payloads.size, 2); // Renewal has its own warning cycle.
-  loseResponse = false;
+  failure = "E_EMAIL_SENDING_NOT_READY";
+  await run(); // Renewal has its own warning cycle.
+  failure = undefined;
   bindings.AUTH_BASE_URL = "https://changed.example.org";
   await run(false, now + 3_600_000);
-  assert.equal(payloads.size, 2); // Same provider key AND frozen original origin/payload.
-  assert.equal(calls, 3);
+  assert.equal(calls(), 3);
+  // The retry sends the frozen original payload, origin included.
+  assert.deepEqual(
+    provider.send.mock.calls[2][0],
+    provider.send.mock.calls[1][0],
+  );
   assert.equal(
     await env.DB.prepare(
       "SELECT count(*) AS count FROM medic_certification_notification WHERE status='sent'",
@@ -4309,11 +4304,12 @@ test("medic mail deduplicates concurrent runs and renewals; ambiguous retries fr
   await env.DB.prepare(
     "UPDATE profile SET medical_certification_expiry='2026-11-12' WHERE user_id='medic'",
   ).run();
-  loseResponse = true;
+  failure = "E_INTERNAL_SERVER_ERROR";
   await run();
-  await run(false, now + 23 * 3_600_000);
+  failure = undefined;
+  await run(false, now + 3_600_000);
   await run(true, now + 24 * 3_600_000);
-  assert.equal(calls, 4); // Never re-send an ambiguous request after the safe retry window.
+  assert.equal(calls(), 4); // Never resend a request that may have been accepted.
   assert.equal(
     await env.DB.prepare(
       "SELECT status FROM medic_certification_notification WHERE expiry='2026-11-12'",
@@ -4329,7 +4325,7 @@ test("medic mail deduplicates concurrent runs and renewals; ambiguous retries fr
     "UPDATE volunteer_status SET active=0 WHERE user_id='medic'",
   ).run();
   await run(false);
-  assert.equal(calls, 4);
+  assert.equal(calls(), 4);
   assert.equal(
     await env.DB.prepare(
       "SELECT status FROM medic_certification_notification WHERE expiry='2026-11-11'",
@@ -4348,5 +4344,5 @@ test("medic mail deduplicates concurrent runs and renewals; ambiguous retries fr
     provider,
     now,
   );
-  assert.equal(calls, 4);
+  assert.equal(calls(), 4);
 });

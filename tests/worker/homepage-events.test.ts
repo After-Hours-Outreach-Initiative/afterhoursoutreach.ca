@@ -13,7 +13,6 @@ test("homepage photo is already cropped to its displayed aspect ratio in product
         vars: { APP_ENV: "production", AUTH_BASE_URL: origin },
         secrets: {
           BETTER_AUTH_SECRET: "homepage-image-test-secret-12345678901234567890",
-          RESEND_API_KEY: "",
         },
       },
     ],
@@ -56,7 +55,7 @@ test("homepage exposes only the next two published dates and remaining spot coun
       {
         configPath: "dist/server/wrangler.json",
         vars: { APP_ENV: "production", AUTH_BASE_URL: origin },
-        secrets: { BETTER_AUTH_SECRET: secret, RESEND_API_KEY: "" },
+        secrets: { BETTER_AUTH_SECRET: secret },
       },
     ],
   });

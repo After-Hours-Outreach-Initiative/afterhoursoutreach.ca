@@ -12,7 +12,7 @@ export async function createSignInOTP(
     BETTER_AUTH_SECRET: secret,
     AUTH_BASE_URL: "https://afterhoursoutreach.ca",
     APP_ENV: "production",
-    RESEND_API_KEY: "",
+    EMAIL: undefined as unknown as SendEmail,
   });
   const otp = await auth.api.createVerificationOTP({
     body: { email, type: "sign-in" },

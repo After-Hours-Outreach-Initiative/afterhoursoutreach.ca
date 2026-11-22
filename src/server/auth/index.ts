@@ -24,7 +24,11 @@ import {
   markSessionSecondFactorVerified,
   revokeOtherAccountSessions,
 } from "../db/sessions";
-import { sendSignInEmail, type SignInEmail } from "./services";
+import {
+  sendSignInEmail,
+  showsSignInEmail,
+  type SignInEmail,
+} from "./services";
 import { signInDestinationForUser } from "./destination";
 
 // A build-time gate keeps the development plugin out of deployed Workers.
@@ -42,7 +46,7 @@ if ("env" in import.meta) {
 
 export type AuthBindings = Pick<
   Env,
-  "DB" | "APP_ENV" | "AUTH_BASE_URL" | "BETTER_AUTH_SECRET" | "RESEND_API_KEY"
+  "DB" | "APP_ENV" | "AUTH_BASE_URL" | "BETTER_AUTH_SECRET" | "EMAIL"
 >;
 
 /** Never trust forwarded hosts or mutate the shared runtime bindings. */
@@ -127,11 +131,12 @@ export function createAuth(
   const db = createDatabase(bindings.DB);
   const services: AuthServices = overrides ?? {
     sendEmail: (email) =>
-      sendSignInEmail(bindings.RESEND_API_KEY, email, bindings.APP_ENV),
+      sendSignInEmail(bindings.EMAIL, email, bindings.APP_ENV),
   };
-  // Simulated email must not exhaust the shared provider quota during local use.
-  // Per-address/IP limits and resend cooldowns still apply in development.
-  const consumeProviderBudget = !development && bindings.APP_ENV !== "local";
+  // Shown email must not exhaust the shared provider quota locally or in previews.
+  // Per-address/IP limits and resend cooldowns still apply there.
+  const showsEmail = showsSignInEmail(bindings.APP_ENV);
+  const consumeProviderBudget = !showsEmail;
   const limitFactorVerification = async (userId: string) => {
     try {
       // The plugin's per-account lockout only covers signed-out challenges.
@@ -187,7 +192,7 @@ export function createAuth(
         // Only the browser requesting a successfully delivered email gets this
         // binding. A scanner fetching the link (even with JS) cannot acquire it.
         if (!changing && ctx) emailLinks.set(ctx.context, link);
-        if (development && localEmail && ctx)
+        if (showsEmail && localEmail && ctx)
           emailDeliveries.set(ctx.context, { localEmail });
       } catch (error) {
         // Better Auth intentionally swallows delivery callback errors. Keep a
@@ -561,7 +566,7 @@ export function createAuth(
               cookie.attributes,
             );
           }
-          if (development && delivery?.localEmail)
+          if (showsEmail && delivery?.localEmail)
             return ctx.json({
               success: true,
               localEmail: delivery.localEmail,

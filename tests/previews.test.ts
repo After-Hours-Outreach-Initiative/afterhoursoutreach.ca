@@ -26,10 +26,9 @@ test("branch previews target the main Worker with non-production bindings, not v
   assert.equal(previews.vars?.APP_ENV, "preview");
   assert.equal(previews.vars?.AUTH_BASE_URL, "");
   assert.equal(previews.vars?.PREVIEW_HOST_SUFFIX, undefined);
-  assert.deepEqual(config.secrets?.required, [
-    "BETTER_AUTH_SECRET",
-    "RESEND_API_KEY",
-  ]);
+  assert.deepEqual(config.secrets?.required, ["BETTER_AUTH_SECRET"]);
+  // Previews show sign-in emails instead of sending them.
+  assert.equal(previews.send_email, undefined);
 });
 
 test("the default environment does not use preview resources", () => {

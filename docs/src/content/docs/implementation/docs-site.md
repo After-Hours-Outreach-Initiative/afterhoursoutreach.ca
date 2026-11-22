@@ -9,7 +9,7 @@ database, Cloudflare credentials, or application secrets, and does not require
 starting the application server.
 
 The optional [Operations dashboard](/dashboard/) adds privileged, local-only
-administration of remote D1 databases and monitoring of Resend limits. It uses
+administration of remote D1 databases and monitoring of email sending. It uses
 Wrangler credentials separately from ordinary reading; see
 [Dashboard administration](/implementation/operations-dashboard/) for setup and safeguards.
 
@@ -185,7 +185,7 @@ with the repository name, and include "Worker" in labels for Worker entry points
 and deployment targets.
 
 Logos are embedded SVG image elements in each native diagram, not external image
-links. GitHub, Cloudflare, Resend, Astro, Better Auth, and Drizzle marks are included
+links. GitHub, Cloudflare, Astro, Better Auth, and Drizzle marks are included
 where relevant. They are stored inside the native scene, work offline,
 and are grouped with their nodes so moving a node also moves its logo. Keep text
 labels alongside logos; do not rely on a logo alone to identify a service.

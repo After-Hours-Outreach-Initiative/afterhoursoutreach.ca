@@ -266,7 +266,11 @@ test("the tap after swiping a sheet away still works", async ({
   const page = await context.newPage();
   await page.goto("/dev/ui/applications/preview?scenario=mixed&latency=0");
   const cdp = await context.newCDPSession(page);
-  const touch = (type: string, x = 0, y = 0) =>
+  const touch = (
+    type: "touchStart" | "touchMove" | "touchEnd" | "touchCancel",
+    x = 0,
+    y = 0,
+  ) =>
     cdp.send("Input.dispatchTouchEvent", {
       type,
       touchPoints: type === "touchEnd" ? [] : [{ x, y }],

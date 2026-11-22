@@ -1,3 +1,4 @@
+import type { EmailOutcome } from "../email";
 import {
   certificationOptions,
   legacyCertificationValues,
@@ -79,7 +80,8 @@ const currentProfile = `EXISTS (
 )`;
 const due = `((n.kind = 'warning' AND n.expiry >= ? AND n.expiry <= ?)
   OR (n.kind = 'expired' AND n.expiry >= ? AND n.expiry < ?))`;
-const available = `(n.status = 'pending' OR (n.status = 'sending' AND n.lease_until <= ?))`;
+// Only unattempted or rejected mail. A lapsed 'sending' lease may have been accepted.
+const available = `n.status = 'pending'`;
 const retryable = `(n.first_attempt_at IS NULL OR n.first_attempt_at > ?)`;
 const dateBindings = (now: number) => {
   const { today, warningThrough, expiredSince } = medicNotificationDates(now);
@@ -98,6 +100,15 @@ export async function pendingMedicNotifications(
   now: number,
   limit: number,
 ) {
+  // A send interrupted mid-request may have been accepted: never resend it.
+  await db
+    .prepare(
+      `UPDATE medic_certification_notification SET status = 'expired',
+      delivery_payload = NULL, lease_token = NULL, lease_until = NULL
+    WHERE status = 'sending' AND lease_until <= ?`,
+    )
+    .bind(now)
+    .run();
   // Retire in bounded chunks; retain unique cycle keys and discard private payloads.
   await db
     .prepare(
@@ -109,7 +120,7 @@ export async function pendingMedicNotifications(
       WHERE ${available} AND (NOT ${retryable} OR NOT ${currentProfile} OR NOT ${due}) LIMIT 100)
   `,
     )
-    .bind(now - retryWindowMs, now, now - retryWindowMs, ...dateBindings(now))
+    .bind(now - retryWindowMs, now - retryWindowMs, ...dateBindings(now))
     .run();
   const rows = await db
     .prepare(
@@ -120,7 +131,7 @@ export async function pendingMedicNotifications(
     ORDER BY n.created_at, n.id LIMIT ?
   `,
     )
-    .bind(now, now - retryWindowMs, ...dateBindings(now), limit)
+    .bind(now - retryWindowMs, ...dateBindings(now), limit)
     .all<MedicNotification>();
   return rows.results;
 }
@@ -150,7 +161,6 @@ export function claimMedicNotification(
       now,
       payload,
       row.id,
-      now,
       now - retryWindowMs,
       ...dateBindings(now),
       row.email,
@@ -158,23 +168,30 @@ export function claimMedicNotification(
     .first<{ delivery_payload: string }>();
 }
 
+/** Rejected sends retry; an unconfirmed send is final to avoid duplicates. */
 export function finishMedicNotification(
   db: Env["DB"],
   id: string,
   token: string,
-  sent: boolean,
+  outcome: EmailOutcome,
   now: number,
 ) {
+  const sent = outcome === "sent";
+  const status = sent
+    ? "sent"
+    : outcome === "unconfirmed"
+      ? "expired"
+      : "pending";
   return db
     .prepare(
       `
     UPDATE medic_certification_notification SET status = ?, sent_at = ?,
-      delivery_payload = CASE WHEN ? THEN NULL ELSE delivery_payload END,
+      delivery_payload = CASE WHEN ? = 'pending' THEN delivery_payload END,
       lease_token = NULL, lease_until = NULL
     WHERE id = ? AND status = 'sending' AND lease_token = ?
   `,
     )
-    .bind(sent ? "sent" : "pending", sent ? now : null, sent ? 1 : 0, id, token)
+    .bind(status, sent ? now : null, status, id, token)
     .run();
 }
 

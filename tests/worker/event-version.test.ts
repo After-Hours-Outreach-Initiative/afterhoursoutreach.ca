@@ -13,7 +13,7 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
       {
         configPath: "dist/server/wrangler.json",
         vars: { APP_ENV: "production", AUTH_BASE_URL: origin },
-        secrets: { BETTER_AUTH_SECRET: secret, RESEND_API_KEY: "" },
+        secrets: { BETTER_AUTH_SECRET: secret },
       },
     ],
   });

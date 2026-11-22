@@ -15,7 +15,6 @@ test("preview builds support real account features but reject development endpoi
         vars: { APP_ENV: "preview", AUTH_BASE_URL: "" },
         secrets: {
           BETTER_AUTH_SECRET: "preview-test-secret-12345678901234567890",
-          RESEND_API_KEY: "",
         },
       },
     ],

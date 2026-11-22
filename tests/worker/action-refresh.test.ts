@@ -17,7 +17,6 @@ for (const failFirst of [false, true]) {
           vars: { APP_ENV: "production", AUTH_BASE_URL: origin },
           secrets: {
             BETTER_AUTH_SECRET: secret,
-            RESEND_API_KEY: "",
           },
         },
       ],

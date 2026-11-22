@@ -12,7 +12,8 @@ The sign-in form requests email verification through Better Auth's Email OTP
 plugin. Delivery includes a sign-in link and a six-digit code. The code can be
 read on another device and entered in the requesting browser. Link completion
 requires the browser binding established when the email was requested; opening
-the email elsewhere does not transfer that binding.
+the email elsewhere does not transfer that binding. Local development and
+branch previews show the email in a dialog instead of sending it.
 
 The link and code use the same single-use verification value. Both expire after
 ten minutes; using either consumes it. Three wrong code attempts invalidate the
@@ -95,7 +96,7 @@ in `src/server/auth/index.ts` and the shared email budget in
 | Sign-in email request  | 30-second per-address cooldown.                                                          |
 | Email-change request   | One-minute per-address cooldown.                                                         |
 | Email requests         | Ten per address per hour and ten per IP per hour.                                        |
-| Shared delivery budget | 80 emails per day, shared with notification mail.                                        |
+| Shared delivery budget | 200 emails per day and 3,000 per 32 days, shared with notification mail.                 |
 | Code verification      | Three attempts per code, ten submissions per address per hour, and 30 per IP per minute. |
 
 The per-address verification budget survives resends and code rotation. These

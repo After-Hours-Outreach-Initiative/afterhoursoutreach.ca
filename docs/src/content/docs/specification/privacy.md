@@ -59,7 +59,7 @@ can see limited rosters in the application. Resolve that discrepancy through
 [Privacy planning](/planning/privacy/#policy-and-code-discrepancies) before treating
 organizer-only roster visibility as an enforced requirement.
 
-Provider disclosures cover Cloudflare hosting/storage, Resend delivery and
+Provider disclosures cover Cloudflare hosting/storage and email delivery,
 notification content, and consented Discord identity/membership and managed roles.
 Discord does not receive volunteer profile answers. Public third-party images and
 outbound donation/social links are also described. Live provider settings and

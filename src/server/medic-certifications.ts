@@ -1,7 +1,7 @@
 import type { AuthBindings } from "./auth";
 import { emailSenders, medicCertificationEmail } from "../data/email-templates";
-import { emailPolicy } from "./db/policy";
 import { takeEmailBudget } from "./db/rate-limits";
+import { sendEmail, type EmailPayload, type EmailSender } from "./email";
 import {
   claimMedicNotification,
   countMedicNotifications,
@@ -10,13 +10,14 @@ import {
   queueMedicCertificationNotifications,
   type MedicNotification,
 } from "./db/medic-certifications";
+import { buildMode, developmentBuild } from "./build-env";
 
 export const medicDiscoveryCron = "0 16 * * *";
 export const medicDeliveryCron = "30 * * * *";
 const batchSize = 5;
 
 function deliveryPayload(row: MedicNotification, origin: string) {
-  return JSON.stringify({
+  return JSON.stringify(<EmailPayload>{
     from: emailSenders.notifications,
     to: [row.email],
     ...medicCertificationEmail(row.kind, row.expiry, origin),
@@ -27,20 +28,16 @@ function deliveryPayload(row: MedicNotification, origin: string) {
 export async function processMedicCertificationNotifications(
   bindings: AuthBindings,
   discover: boolean,
-  fetcher: typeof fetch = fetch,
+  sender: EmailSender | undefined = bindings.EMAIL,
   now = Date.now(),
 ) {
   if (
-    import.meta.env?.DEV ||
-    import.meta.env?.MODE === "preview" ||
+    developmentBuild() ||
+    buildMode() === "preview" ||
     bindings.APP_ENV !== "production"
   )
     return { skipped: true };
-  if (
-    !bindings.RESEND_API_KEY ||
-    !bindings.BETTER_AUTH_SECRET ||
-    !bindings.AUTH_BASE_URL
-  )
+  if (!sender || !bindings.BETTER_AUTH_SECRET || !bindings.AUTH_BASE_URL)
     throw new Error("Medic certification email is not configured");
   const origin = new URL(bindings.AUTH_BASE_URL).origin;
   if (!origin.startsWith("https://"))
@@ -60,7 +57,7 @@ export async function processMedicCertificationNotifications(
       failed++;
       break;
     }
-    // Same pacing and shared quota as event notifications (Resend free tier).
+    // Same pacing and shared quota as the other notification email.
     if (sent + failed > 0)
       await new Promise((resolve) => setTimeout(resolve, 600));
     const token = crypto.randomUUID();
@@ -72,26 +69,14 @@ export async function processMedicCertificationNotifications(
       now,
     );
     if (!claimed) continue;
-    try {
-      const response = await fetcher("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${bindings.RESEND_API_KEY}`,
-          "Content-Type": "application/json",
-          "Idempotency-Key": `medic-certification/${row.id}`,
-        },
-        signal: AbortSignal.timeout(emailPolicy.timeoutMs),
-        body: claimed.delivery_payload,
-      });
-      // Never read/log a provider body: it can contain recipient details.
-      await response.body?.cancel();
-      if (!response.ok) throw new Error("Provider rejected delivery");
-      await finishMedicNotification(db, row.id, token, true, now);
-      sent++;
-    } catch {
-      failed++;
-      await finishMedicNotification(db, row.id, token, false, now);
-    }
+    const outcome = await sendEmail(
+      sender,
+      JSON.parse(claimed.delivery_payload) as EmailPayload,
+    );
+    await finishMedicNotification(db, row.id, token, outcome, now);
+    if (outcome === "sent") sent++;
+    else failed++;
+    if (outcome === "limited") break;
   }
   return { queued, sent, failed, ...(await countMedicNotifications(db)) };
 }

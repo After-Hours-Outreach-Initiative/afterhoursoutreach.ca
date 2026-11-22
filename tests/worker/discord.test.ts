@@ -21,7 +21,6 @@ test("Discord routes enforce same-origin consent and browser/session binding wit
         },
         secrets: {
           BETTER_AUTH_SECRET: secret,
-          RESEND_API_KEY: "",
           DISCORD_CLIENT_SECRET: "test-only-client-secret",
           DISCORD_BOT_TOKEN: "test-only-bot-token",
           DISCORD_TOKEN_ENCRYPTION_KEY: btoa(

@@ -6,21 +6,21 @@ import {
 import { emailHtmlSql, emailTextSql } from "./email-text";
 import type { NaloxoneCompletionOptions } from "./naloxone";
 import { emailPolicy } from "./policy";
-import { hashAuthValue } from "./rate-limits";
+import { emailBudgetKeys, emailBudgetSql } from "./rate-limits";
 import { personDisplayNameSql } from "./sql";
+import { buildMode, developmentBuild } from "../build-env";
 
-// Resend retains keys for 24 hours. Keep a full hour of safety margin, and
-// NEVER mint a replacement key after ambiguous acceptance or expiration.
-// https://resend.com/docs/dashboard/emails/idempotency-keys
+// Rejected sends retry for less than a day after the first attempt. A send that
+// may have been accepted is never retried: the provider has no idempotency keys.
 export const submissionRetryWindowMs = 23 * 60 * 60 * 1000;
 const leaseMs = 2 * 60 * 1000;
 
 export function submissionNotificationMode(
   bindings: Pick<AuthBindings, "APP_ENV">,
 ) {
-  if (import.meta.env?.MODE === "preview" || bindings.APP_ENV === "preview")
+  if (buildMode() === "preview" || bindings.APP_ENV === "preview")
     return "preview";
-  if (import.meta.env?.DEV || bindings.APP_ENV === "local") return "local";
+  if (developmentBuild() || bindings.APP_ENV === "local") return "local";
   return bindings.APP_ENV === "production" ? "production" : "preview";
 }
 
@@ -114,19 +114,26 @@ export async function pendingSubmissionNotifications(
     )
     .bind(mode)
     .run();
-  const expiration = await db
-    .prepare(
-      `UPDATE application_submission_notification SET status='expired',lease_until=NULL
-    WHERE mode=? AND status IN ('pending','sending') AND first_attempt_at <= ?
-      AND (lease_until IS NULL OR lease_until <= ?)`,
-    )
-    .bind(mode, now - submissionRetryWindowMs, now)
-    .run();
+  // A lapsed lease means a send may have been accepted before the run stopped.
+  const [abandoned, expiration] = await db.batch([
+    db
+      .prepare(
+        `UPDATE application_submission_notification
+      SET status='expired',outcome='unconfirmed',lease_until=NULL,lease_token=NULL
+      WHERE mode=? AND status='sending' AND lease_until <= ?`,
+      )
+      .bind(mode, now),
+    db
+      .prepare(
+        `UPDATE application_submission_notification SET status='expired',lease_until=NULL
+      WHERE mode=? AND status='pending' AND first_attempt_at <= ?`,
+      )
+      .bind(mode, now - submissionRetryWindowMs),
+  ]);
   const result = await db
     .prepare(
       `SELECT id FROM application_submission_notification
-    WHERE mode=? AND status IN ('pending','sending') AND next_attempt_at <= ?
-      AND (lease_until IS NULL OR lease_until <= ?)
+    WHERE mode=? AND status='pending' AND next_attempt_at <= ?
       AND (first_attempt_at IS NULL OR first_attempt_at > ?)
       AND ${reviewIntentGuard} AND ${subscribedRecipientGuard}
       ${operationId ? "AND operation_id=?" : ""}
@@ -135,13 +142,15 @@ export async function pendingSubmissionNotifications(
     .bind(
       mode,
       now,
-      now,
       now - submissionRetryWindowMs,
       ...(operationId ? [operationId] : []),
       limit,
     )
     .all<{ id: string }>();
-  return { notifications: result.results, expired: expiration.meta.changes };
+  return {
+    notifications: result.results,
+    expired: abandoned.meta.changes + expiration.meta.changes,
+  };
 }
 
 export function claimSubmissionNotification(
@@ -154,29 +163,19 @@ export function claimSubmissionNotification(
   return db
     .prepare(
       `UPDATE application_submission_notification SET status='sending',
-      outcome=CASE WHEN status='sending' THEN 'unconfirmed' ELSE outcome END,
       lease_token=?,lease_until=?
-    WHERE id=? AND mode=? AND status IN ('pending','sending')
-      AND next_attempt_at <= ? AND (lease_until IS NULL OR lease_until <= ?)
+    WHERE id=? AND mode=? AND status='pending' AND next_attempt_at <= ?
       AND (first_attempt_at IS NULL OR first_attempt_at > ?)
       AND ${reviewIntentGuard} AND ${subscribedRecipientGuard}
     RETURNING id,payload,attempts,first_attempt_at`,
     )
-    .bind(
-      token,
-      now + leaseMs,
-      id,
-      mode,
-      now,
-      now,
-      now - submissionRetryWindowMs,
-    )
+    .bind(token, now + leaseMs, id, mode, now, now - submissionRetryWindowMs)
     .first<SubmissionNotification>();
 }
 
 /** Reserve the SAME shared sign-in/event budget atomically with the outbox mark.
- * A same-window idempotent replay costs no extra email; a new UTC day reserves
- * again conservatively. A crash cannot consume quota without recording it.
+ * A same-window retry of a rejected send reuses its reservation; a new UTC day
+ * reserves again. A crash cannot consume quota without recording it.
  */
 export async function beginSubmissionNotificationAttempt(
   bindings: AuthBindings,
@@ -184,32 +183,32 @@ export async function beginSubmissionNotificationAttempt(
   token: string,
   now: number,
 ) {
-  const start =
-    Math.floor(now / emailPolicy.budgetWindowMs) * emailPolicy.budgetWindowMs;
-  const key = await hashAuthValue(
+  const { start, key, recent, expiresAt } = await emailBudgetKeys(
     bindings.BETTER_AUTH_SECRET,
-    `rate:send-total:${emailPolicy.budgetWindowMs}:${start}`,
+    now,
   );
   const db = bindings.DB;
   const results = await db.batch([
     db
       .prepare(
-        `INSERT INTO auth_rate_limit (key,count,expires_at)
-      SELECT ?,1,? WHERE EXISTS (SELECT 1 FROM application_submission_notification
+        emailBudgetSql(`EXISTS (SELECT 1 FROM application_submission_notification
         WHERE id=? AND status='sending' AND mode='production' AND lease_token=?
           AND lease_until > ? AND budget_window IS NOT ?
           AND (first_attempt_at IS NULL OR first_attempt_at > ?)
-          AND ${reviewIntentGuard} AND ${subscribedRecipientGuard})
-      ON CONFLICT(key) DO UPDATE SET count=count+1 WHERE count < ?`,
+          AND ${reviewIntentGuard} AND ${subscribedRecipientGuard})`),
       )
       .bind(
         key,
-        start + emailPolicy.budgetWindowMs,
+        1,
+        expiresAt,
         id,
         token,
         now,
         start,
         now - submissionRetryWindowMs,
+        1,
+        recent,
+        emailPolicy.rollingLimit,
         emailPolicy.dailyLimit,
       ),
     db
@@ -233,6 +232,7 @@ export async function beginSubmissionNotificationAttempt(
   return (results[2].results[0] as SubmissionNotification | undefined) ?? null;
 }
 
+/** An unconfirmed send is final: retrying it could deliver a duplicate. */
 export async function finishSubmissionNotification(
   db: Env["DB"],
   id: string,
@@ -242,6 +242,11 @@ export async function finishSubmissionNotification(
   nextAttemptAt: number,
 ) {
   const accepted = outcome === "sent" || outcome === "local";
+  const status = accepted
+    ? outcome
+    : outcome === "unconfirmed"
+      ? "expired"
+      : "pending";
   await db
     .prepare(
       `UPDATE application_submission_notification SET status=?,sent_at=?,
@@ -250,7 +255,7 @@ export async function finishSubmissionNotification(
     WHERE id=? AND status='sending' AND lease_token=?`,
     )
     .bind(
-      accepted ? outcome : "pending",
+      status,
       accepted ? now : null,
       Number(accepted),
       outcome,

@@ -10,19 +10,23 @@ import {
   markBatchBudget,
   pendingBatches,
   pendingNotifications,
-  uncertainNotifications,
 } from "../db/notifications";
+import { sendEmail, type EmailPayload, type EmailSender } from "../email";
+import { buildMode, developmentBuild } from "../build-env";
 
 /** Only an explicitly requested operation may be sent. Never sweep the outbox. */
 export async function deliverNotifications(
   bindings: AuthBindings,
   operation: string,
-  fetcher: typeof fetch = fetch,
+  sender: EmailSender | undefined = bindings.EMAIL,
 ) {
   if (!operation) throw new Error("An email operation is required.");
+  // Previews have no email binding; never send from one even if it is bound.
+  if (buildMode() === "preview") sender = undefined;
   const db = bindings.DB;
-  const local = Boolean(import.meta.env?.DEV) || bindings.APP_ENV === "local";
-  const signal = AbortSignal.timeout(emailPolicy.timeoutMs);
+  const local = developmentBuild() || bindings.APP_ENV === "local";
+  // Each email is its own request; bound the whole run, not just one send.
+  const deadline = Date.now() + 3 * emailPolicy.timeoutMs;
   let limited = false;
   let unavailable = false;
   let stopped = false;
@@ -30,16 +34,13 @@ export async function deliverNotifications(
     const token = crypto.randomUUID();
     const batch = await claimBatch(db, id, token);
     if (!batch) return;
-    const payload = JSON.parse(batch.payload) as {
-      to: string[];
-      subject: string;
-      text: string;
-    }[];
+    // New batches hold one email. Older batches can hold several.
+    const payload = JSON.parse(batch.payload) as EmailPayload[];
     let outcome: "sent" | "local" | "failed" | "unconfirmed" | null = null;
     let requested = false;
     try {
       if (!local) {
-        if (!bindings.RESEND_API_KEY) {
+        if (!sender) {
           unavailable = true;
           outcome = "failed";
           stopped = true;
@@ -48,8 +49,8 @@ export async function deliverNotifications(
         const start =
           Math.floor(Date.now() / emailPolicy.budgetWindowMs) *
           emailPolicy.budgetWindowMs;
-        // Reserve emails, not HTTP calls. A same-day idempotent replay costs no
-        // additional emails; crossing a budget window requires a fresh reservation.
+        // Reserve emails, not calls. A same-day retry of a rejected send reuses
+        // its reservation; crossing a budget window requires a fresh one.
         if (batch.budget_window !== start) {
           const reserved = await takeEmailBudget(
             db,
@@ -58,36 +59,24 @@ export async function deliverNotifications(
           );
           await markBatchBudget(db, id, token, reserved);
         }
-        signal.throwIfAborted();
-        requested = true;
-        const response = await fetcher("https://api.resend.com/emails/batch", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${bindings.RESEND_API_KEY}`,
-            "Content-Type": "application/json",
-            "Idempotency-Key": `event-batch/${batch.id}`,
-          },
-          signal,
-          body: batch.payload,
-        });
-        if (!response.ok) {
-          await response.body?.cancel();
-          // Server errors / an in-progress idempotent request can be ambiguous.
+        for (const [index, email] of payload.entries()) {
+          if (Date.now() >= deadline) {
+            outcome = index ? "unconfirmed" : null;
+            stopped = true;
+            return;
+          }
+          requested = true;
+          const result = await sendEmail(
+            sender,
+            email,
+            Math.min(emailPolicy.timeoutMs, deadline - Date.now()),
+          );
+          if (result === "sent") continue;
+          if (result === "limited") limited = stopped = true;
+          // Earlier emails in this batch were accepted: never resend them.
           outcome =
-            response.status >= 500 || response.status === 409
-              ? "unconfirmed"
-              : "failed";
-          return;
-        }
-        const result = (await response.json()) as { data?: { id?: string }[] };
-        // Default batch validation is atomic. A malformed/partial response is not
-        // evidence that every email was accepted: replay the entire frozen key.
-        if (
-          !Array.isArray(result.data) ||
-          result.data.length !== payload.length ||
-          result.data.some((email) => !email.id)
-        ) {
-          outcome = "unconfirmed";
+            index || result === "unconfirmed" ? "unconfirmed" : "failed";
+          if (outcome === "unconfirmed") stopped = true;
           return;
         }
       }
@@ -95,10 +84,10 @@ export async function deliverNotifications(
     } catch (error) {
       if (error instanceof RequestError && error.status === 429) limited = true;
       else outcome = requested ? "unconfirmed" : "failed";
-      if (signal.aborted || limited) stopped = true;
+      stopped = true;
     } finally {
-      // If this write fails after acceptance, the lease eventually expires and
-      // an explicit retry replays the SAME payload/key, never a newly built batch.
+      // If this write fails after acceptance, the lease lapses and the batch is
+      // cancelled as unconfirmed, never sent again.
       await finishBatch(db, id, token, outcome);
     }
   };
@@ -116,24 +105,18 @@ export async function deliverNotifications(
       limited = true;
       break;
     }
+    // One email per batch: an unclear result affects only that recipient.
     const id = await createNotificationBatch(
       db,
       operation,
-      rows.slice(0, Math.min(100, remaining)),
+      rows.slice(0, local ? 100 : 1),
       bindings.AUTH_BASE_URL,
     );
     if (!id) break; // Another explicit request grouped these rows; do not race it.
     await sendBatch(id);
   }
   const counts = await countNotifications(db, operation);
-  const unconfirmed = await uncertainNotifications(db, operation);
-  return {
-    ...counts,
-    unconfirmed,
-    limited,
-    unavailable,
-    failed: Math.max(0, counts.pending - unconfirmed),
-  };
+  return { ...counts, limited, unavailable, failed: counts.pending };
 }
 
 export function notificationNotice(
@@ -141,19 +124,15 @@ export function notificationNotice(
 ) {
   // Successful delivery is silent; only problems need email-specific feedback.
   const parts: string[] = [];
-  if (delivery.pending) {
-    if (delivery.unconfirmed)
-      parts.push(
-        `${delivery.unconfirmed} email${delivery.unconfirmed === 1 ? " has" : "s have"} unconfirmed delivery, possibly because the provider timed out.`,
-      );
-    if (delivery.failed)
-      parts.push(
-        `${delivery.failed} email${delivery.failed === 1 ? " could" : "s could"} not be sent${delivery.limited ? " because of the shared daily email limit" : ""}.`,
-      );
+  if (delivery.pending)
     parts.push(
+      `${delivery.pending} email${delivery.pending === 1 ? " could" : "s could"} not be sent${delivery.limited ? " because of the shared email limit" : ""}.`,
       "Retry email only; the saved change will not be repeated. Retries are available for 23 hours after the change.",
     );
-  }
+  if (delivery.unconfirmed)
+    parts.push(
+      `${delivery.unconfirmed} email${delivery.unconfirmed === 1 ? "" : "s"} may not have arrived and will not be resent, to avoid duplicates. Contact the recipients directly.`,
+    );
   if (delivery.expired)
     parts.push(
       `${delivery.expired} email${delivery.expired === 1 ? " is" : "s are"} no longer safe to retry. Contact the recipients directly.`,

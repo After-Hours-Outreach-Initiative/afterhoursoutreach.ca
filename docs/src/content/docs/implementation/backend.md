@@ -13,7 +13,7 @@ The server side behind accounts, applications, and event signups.
 - Drizzle for the schema and migrations.
 - Better Auth with the official Email OTP plugin for sign in and sessions. See
   [Accounts specification](/specification/accounts/).
-- Resend for sign in and notification emails.
+- Cloudflare Email Service for sign in and notification emails.
 
 All HTTP API endpoints use `/api/v1/`, including authentication and health checks.
 The unversioned routes are no longer served. This keeps event requests outside the

@@ -13,7 +13,7 @@ Configure a local `BETTER_AUTH_SECRET` of at least 32 characters in
 background server, and seeds the sample accounts and events the first time. No extra
 frontend mode is needed. Dev, production builds, and Worker previews use the same components and
 account/event backend. D1 persists under `.wrangler/state/`; remote bindings
-are disabled. A Resend key is not required locally. Sign-in links and codes
+are disabled. Email is never sent locally. Sign-in links and codes
 appear in a dialog, not an inbox. Local D1 rate limits still apply.
 
 Automated browser tests use `pnpm test:ui`, which starts its own server and

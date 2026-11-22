@@ -13,7 +13,7 @@ export function emailButtonValue(action: EmailButton | undefined) {
       : JSON.stringify(action);
 }
 
-// Stay inside Resend's 24-hour idempotency lifetime, including after a timeout.
+// Rejected sends can be retried for a day; unconfirmed sends never are.
 export const notificationRetryHours = 23;
 const retryWindowMs = notificationRetryHours * 60 * 60 * 1000;
 const leaseMs = 60 * 1000;
@@ -56,7 +56,8 @@ export async function countNotifications(db: Env["DB"], operation: string) {
     count(CASE WHEN n.status IN ('sent','local') THEN 1 END) AS sent,
     count(CASE WHEN n.status = 'local' THEN 1 END) AS simulated,
     count(CASE WHEN n.status IN ('pending','sending') AND coalesce(b.status,'pending')!='cancelled' AND coalesce(b.created_at,n.created_at) > ? AND delivery_to IS NOT NULL THEN 1 END) AS pending,
-    count(CASE WHEN n.status IN ('pending','sending') AND (b.status='cancelled' OR coalesce(b.created_at,n.created_at) <= ? OR delivery_to IS NULL) THEN 1 END) AS expired
+    count(CASE WHEN n.status IN ('pending','sending') AND b.status='cancelled' AND b.outcome='unconfirmed' THEN 1 END) AS unconfirmed,
+    count(CASE WHEN n.status IN ('pending','sending') AND coalesce(b.outcome,'')!='unconfirmed' AND (b.status='cancelled' OR coalesce(b.created_at,n.created_at) <= ? OR delivery_to IS NULL) THEN 1 END) AS expired
     FROM event_notification n LEFT JOIN event_notification_batch b ON b.id=n.batch_id WHERE n.operation_id=?`,
     )
     .bind(cutoff, cutoff, operation)
@@ -64,9 +65,12 @@ export async function countNotifications(db: Env["DB"], operation: string) {
       sent: number;
       simulated: number;
       pending: number;
+      unconfirmed: number;
       expired: number;
     }>();
-  return counts ?? { sent: 0, simulated: 0, pending: 0, expired: 0 };
+  return (
+    counts ?? { sent: 0, simulated: 0, pending: 0, unconfirmed: 0, expired: 0 }
+  );
 }
 
 export async function pendingNotifications(db: Env["DB"], operation: string) {
@@ -138,12 +142,21 @@ export async function createNotificationBatch(
 }
 
 export async function pendingBatches(db: Env["DB"], operation: string) {
+  const now = Date.now();
+  // A lapsed lease means the send may have been accepted: never resend it.
+  await db
+    .prepare(
+      `UPDATE event_notification_batch SET status='cancelled', outcome='unconfirmed', lease_token=NULL, lease_until=NULL
+    WHERE operation_id=? AND status='sending' AND lease_until < ?`,
+    )
+    .bind(operation, now)
+    .run();
   const rows = await db
     .prepare(
       `SELECT id FROM event_notification_batch
-    WHERE operation_id=? AND status IN ('pending','sending') AND created_at > ? ORDER BY created_at, id`,
+    WHERE operation_id=? AND status='pending' AND created_at > ? ORDER BY created_at, id`,
     )
-    .bind(operation, Date.now() - retryWindowMs)
+    .bind(operation, now - retryWindowMs)
     .all<{ id: string }>();
   return rows.results;
 }
@@ -152,14 +165,14 @@ export function claimBatch(db: Env["DB"], id: string, token: string) {
   const now = Date.now();
   return db
     .prepare(
-      `UPDATE event_notification_batch SET status='sending', outcome=CASE WHEN status='sending' THEN 'unconfirmed' ELSE outcome END, lease_token=?, lease_until=?
-    WHERE id=? AND status IN ('pending','sending') AND (lease_until IS NULL OR lease_until < ?)
-    AND created_at > ? RETURNING id, payload, budget_window`,
+      `UPDATE event_notification_batch SET status='sending', lease_token=?, lease_until=?
+    WHERE id=? AND status='pending' AND created_at > ? RETURNING id, payload, budget_window`,
     )
-    .bind(token, now + leaseMs, id, now, now - retryWindowMs)
+    .bind(token, now + leaseMs, id, now - retryWindowMs)
     .first<NotificationBatch>();
 }
 
+/** An unconfirmed batch is cancelled: retrying it could deliver duplicates. */
 export async function finishBatch(
   db: Env["DB"],
   id: string,
@@ -174,7 +187,11 @@ export async function finishBatch(
       WHERE id=? AND lease_token=?`,
       )
       .bind(
-        accepted ? outcome : "pending",
+        accepted
+          ? outcome
+          : outcome === "unconfirmed"
+            ? "cancelled"
+            : "pending",
         Number(accepted),
         outcome,
         id,
@@ -207,16 +224,4 @@ export function markBatchBudget(
     )
     .bind(start, id, token)
     .run();
-}
-
-export async function uncertainNotifications(db: Env["DB"], operation: string) {
-  return (
-    (await db
-      .prepare(
-        `SELECT count(*) AS n FROM event_notification n JOIN event_notification_batch b ON b.id=n.batch_id
-    WHERE n.operation_id=? AND n.status IN ('pending','sending') AND b.status!='cancelled' AND (b.outcome='unconfirmed' OR b.status='sending')`,
-      )
-      .bind(operation)
-      .first<number>("n")) ?? 0
-  );
 }

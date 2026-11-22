@@ -24,6 +24,7 @@ import {
   codeOfConductRules,
   codeOfConductVersion,
 } from "../../src/data/code-of-conduct";
+import { withoutEmail } from "../helpers/without-email";
 
 const origin = "https://afterhoursoutreach.ca";
 const secret = "test-only-worker-auth-secret-12345678901234567890";
@@ -62,14 +63,13 @@ describe(
     const server = createTestHarness({
       workers: [
         {
-          configPath: "dist/server/wrangler.json",
+          configPath: withoutEmail(),
           vars: {
             APP_ENV: "production",
             AUTH_BASE_URL: origin,
           },
           secrets: {
             BETTER_AUTH_SECRET: secret,
-            RESEND_API_KEY: "",
           },
         },
       ],
@@ -1699,7 +1699,7 @@ describe(
         APP_ENV: "production",
         AUTH_BASE_URL: origin,
         BETTER_AUTH_SECRET: secret,
-        RESEND_API_KEY: "",
+        EMAIL: undefined as unknown as SendEmail,
       });
       const seed = (path: string, body: object) =>
         auth.handler(
@@ -1846,7 +1846,7 @@ test("a built Worker cannot enable account switching with local runtime vars", a
           APP_ENV: "local",
           AUTH_BASE_URL: "http://localhost:4321",
         },
-        secrets: { BETTER_AUTH_SECRET: secret, RESEND_API_KEY: "" },
+        secrets: { BETTER_AUTH_SECRET: secret },
       },
     ],
   });

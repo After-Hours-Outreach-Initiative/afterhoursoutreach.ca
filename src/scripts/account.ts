@@ -405,11 +405,14 @@ onPageLoad((page) => {
     );
     const code = confirm.querySelector<HTMLInputElement>('[name="code"]')!;
     code.focus();
-    if (import.meta.env.DEV && result.localEmail) {
+    if (
+      (import.meta.env.DEV || import.meta.env.MODE === "preview") &&
+      result.localEmail
+    ) {
       const { localEmailDialog } =
         await import("../dev/scripts/local-email-dialog");
       const outcome = await localEmailDialog({
-        title: "Local email-change code",
+        title: `${import.meta.env.DEV ? "Local" : "Preview"} email-change code`,
         emails: [
           {
             to: result.localEmail.email,

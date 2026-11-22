@@ -23,6 +23,16 @@
       "remote": false,
     },
   ],
+  // Previews have no binding: they show sign-in emails instead of sending them.
+  "send_email": [
+    {
+      "name": "EMAIL",
+      "allowed_sender_addresses": [
+        "accounts@afterhoursoutreach.ca",
+        "info@afterhoursoutreach.ca",
+      ],
+    },
+  ],
   "vars": {
     "APP_ENV": "production",
     "AUTH_BASE_URL": "https://afterhoursoutreach.ca",
@@ -35,7 +45,7 @@
   },
   // Secret values are configured separately for each deployment target.
   "secrets": {
-    "required": ["BETTER_AUTH_SECRET", "RESEND_API_KEY"],
+    "required": ["BETTER_AUTH_SECRET"],
   },
   "observability": {
     "enabled": true,

@@ -20,10 +20,20 @@ import { POST as confirmNaloxone } from "../src/pages/api/v1/account/naloxone";
 import {
   hashAuthValue,
   limitEmailRequests,
+  takeEmailBudget,
   takeRateLimit,
 } from "../src/server/db/rate-limits";
-import { sendSignInEmail, type SignInEmail } from "../src/server/auth/services";
-import { deliverNotifications } from "../src/server/events/notifications";
+import {
+  sendSignInEmail,
+  showsSignInEmail,
+  type SignInEmail,
+} from "../src/server/auth/services";
+import { emailError, emailSender } from "./helpers/email-sender";
+import { emailPolicy } from "../src/server/db/policy";
+import {
+  deliverNotifications,
+  notificationNotice,
+} from "../src/server/events/notifications";
 import {
   countNotifications,
   queueNotification,
@@ -64,7 +74,7 @@ beforeEach(async () => {
     APP_ENV: "production",
     AUTH_BASE_URL: origin,
     BETTER_AUTH_SECRET: "test-only-auth-secret-not-a-deployed-secret-123456789",
-    RESEND_API_KEY: "test-only-resend-key",
+    EMAIL: emailSender(),
   };
   outbox = [];
   auth = createAuth(bindings, "192.0.2.1", {
@@ -215,9 +225,9 @@ test("simulated sign-in email preserves provider quota while hosted requests sti
     `rate:send-total:86400000:${start}`,
   );
   await bindings.DB.prepare(
-    "INSERT INTO auth_rate_limit (key, count, expires_at) VALUES (?, 80, ?)",
+    "INSERT INTO auth_rate_limit (key, count, expires_at) VALUES (?, ?, ?)",
   )
-    .bind(key, start + 86_400_000)
+    .bind(key, emailPolicy.dailyLimit, start + 86_400_000)
     .run();
   const local = createAuth({ ...bindings, APP_ENV: "local" }, "192.0.2.2");
   const response = await local.handler(
@@ -232,7 +242,7 @@ test("simulated sign-in email preserves provider quota while hosted requests sti
     await bindings.DB.prepare("SELECT count FROM auth_rate_limit WHERE key=?")
       .bind(key)
       .first("count"),
-    80,
+    emailPolicy.dailyLimit,
   );
   const hosted = await request("/email-otp/send-verification-otp", {
     email: "hosted@example.org",
@@ -256,13 +266,13 @@ test("local D1 event notifications never contact a provider, even with a real-sh
     "Sample subject",
     "Sample body",
   ).run();
+  const sender = emailSender();
   const result = await deliverNotifications(
     { ...bindings, APP_ENV: "local" },
     operation,
-    async () => {
-      throw new Error("A local notification must not call fetch");
-    },
+    sender,
   );
+  assert.equal(sender.send.mock.calls.length, 0);
   assert.equal(result.sent, 1);
   assert.equal(result.failed, 0);
   assert.equal(result.pending, 0);
@@ -278,7 +288,7 @@ test("local D1 event notifications never contact a provider, even with a real-sh
   );
 });
 
-test("event delivery retries use stable idempotency keys and atomic leases without exposing provider errors", async () => {
+test("rejected event email retries the original payload once, without exposing provider errors", async () => {
   const { cookie } = await signIn();
   const current = await auth.api.getSession({
     headers: new Headers({ cookie }),
@@ -292,30 +302,20 @@ test("event delivery retries use stable idempotency keys and atomic leases witho
     "Sample subject",
     "Sample body",
   ).run();
-  const keys: string[] = [];
-  const payloads: string[] = [];
-  const rejected: typeof fetch = async (_url, init) => {
-    keys.push(new Headers(init?.headers).get("Idempotency-Key")!);
-    payloads.push(String(init?.body));
-    return new Response("PRIVATE PROVIDER BODY", { status: 503 });
-  };
+  const rejected = emailSender(() => {
+    throw emailError("E_EMAIL_SENDING_NOT_READY");
+  });
   const failure = await deliverNotifications(bindings, operation, rejected);
-  assert.equal(failure.unconfirmed, 1);
+  assert.equal(failure.unconfirmed, 0);
   assert.equal(failure.pending, 1);
   assert.doesNotMatch(
     JSON.stringify(failure),
     /PRIVATE PROVIDER BODY|volunteer@example.org/,
   );
-  let calls = 0;
-  const accepted: typeof fetch = async (_url, init) => {
-    calls++;
-    keys.push(new Headers(init?.headers).get("Idempotency-Key")!);
-    payloads.push(String(init?.body));
-    const payload = JSON.parse(String(init?.body));
-    assert.equal(payload[0].subject, "Sample subject");
-    assert.doesNotMatch(payload[0].text, /public branch preview/);
-    return Response.json({ data: [{ id: "accepted" }] });
-  };
+  const accepted = emailSender((message) => {
+    assert.equal(message.subject, "Sample subject");
+    assert.doesNotMatch(String(message.text), /public branch preview/);
+  });
   await Promise.all([
     deliverNotifications(
       {
@@ -328,11 +328,10 @@ test("event delivery retries use stable idempotency keys and atomic leases witho
     ),
     deliverNotifications(bindings, operation, accepted),
   ]);
-  assert.equal(calls, 1);
-  assert.equal(new Set(keys).size, 1);
-  assert.equal(
-    new Set(payloads).size,
-    1,
+  assert.equal(accepted.send.mock.calls.length, 1);
+  assert.deepEqual(
+    accepted.send.mock.calls[0][0],
+    rejected.send.mock.calls[0][0],
     "Cross-branch retries must preserve the original sending payload",
   );
   assert.equal(
@@ -346,7 +345,37 @@ test("event delivery retries use stable idempotency keys and atomic leases witho
     "sent",
   );
   await deliverNotifications(bindings, operation, accepted);
-  assert.equal(calls, 1);
+  assert.equal(accepted.send.mock.calls.length, 1);
+});
+
+test("an event email that may have been sent is never resent", async () => {
+  const { cookie } = await signIn();
+  const current = await auth.api.getSession({
+    headers: new Headers({ cookie }),
+  });
+  assert.ok(current);
+  const operation = crypto.randomUUID();
+  await queueNotification(
+    bindings.DB,
+    operation,
+    current.user.id,
+    "Sample subject",
+    "Sample body",
+  ).run();
+  const result = await deliverNotifications(
+    bindings,
+    operation,
+    emailSender(() => {
+      throw emailError("E_INTERNAL_SERVER_ERROR");
+    }),
+  );
+  assert.equal(result.unconfirmed, 1);
+  assert.equal(result.pending, 0);
+  assert.match(notificationNotice(result), /Contact the recipients directly/);
+  const accepted = emailSender();
+  const again = await deliverNotifications(bindings, operation, accepted);
+  assert.equal(accepted.send.mock.calls.length, 0);
+  assert.equal(again.unconfirmed, 1);
 });
 
 test("notifications share the sign-in sending budget and old pending mail is not blindly resent", async () => {
@@ -368,34 +397,31 @@ test("notifications share the sign-in sending budget and old pending mail is not
     bindings.BETTER_AUTH_SECRET,
     `rate:send-total:86400000:${start}`,
   );
-  await bindings.DB.prepare("UPDATE auth_rate_limit SET count=80 WHERE key=?")
-    .bind(key)
+  await bindings.DB.prepare("UPDATE auth_rate_limit SET count=? WHERE key=?")
+    .bind(emailPolicy.dailyLimit, key)
     .run();
-  let calls = 0;
-  const fetcher: typeof fetch = async () => {
-    calls++;
-    return new Response("{}");
-  };
+  const sender = emailSender();
   assert.equal(
-    (await deliverNotifications(bindings, operation, fetcher)).failed,
+    (await deliverNotifications(bindings, operation, sender)).failed,
     1,
   );
-  assert.equal(calls, 0);
+  assert.equal(sender.send.mock.calls.length, 0);
   await bindings.DB.prepare(
     "UPDATE event_notification SET created_at=? WHERE operation_id=?",
   )
     .bind(Date.now() - 24 * 3_600_000, operation)
     .run();
-  const expired = await deliverNotifications(bindings, operation, fetcher);
+  const expired = await deliverNotifications(bindings, operation, sender);
   assert.equal(expired.pending, 0);
   assert.equal(expired.expired, 1);
   assert.deepEqual(await countNotifications(bindings.DB, operation), {
     sent: 0,
     simulated: 0,
     pending: 0,
+    unconfirmed: 0,
     expired: 1,
   });
-  assert.equal(calls, 0);
+  assert.equal(sender.send.mock.calls.length, 0);
 });
 
 test("auth uses the configured site origin or request URL without trusting forwarded hosts", () => {
@@ -1023,15 +1049,11 @@ test("IP sending limits prevent cycling recipient addresses", async () => {
 });
 
 test("the global daily limit blocks email requests before creating challenges", async () => {
-  for (let i = 0; i < 80; i++) {
-    await takeRateLimit(
-      bindings.DB,
-      bindings.BETTER_AUTH_SECRET,
-      "send-total",
-      80,
-      86_400_000,
-    );
-  }
+  await takeEmailBudget(
+    bindings.DB,
+    bindings.BETTER_AUTH_SECRET,
+    emailPolicy.dailyLimit,
+  );
   assert.equal(
     (
       await request("/email-otp/send-verification-otp", {
@@ -2657,83 +2679,101 @@ test("authenticator removal requires recent verified sign-in, current TOTP and c
   );
 });
 
-test("Resend receives the same sign-in message in every hosted environment and hides provider errors", async () => {
+test("Cloudflare receives the sign-in message in hosted builds and provider errors stay hidden", async () => {
   const email = {
     email: "volunteer@example.org",
     code: "123456",
     url: `${origin}/volunteer/sign-in/complete#email=volunteer%40example.org&otp=123456`,
     id: "test",
   };
+  // Only a preview build may show the email; this test build is not one.
+  assert.equal(showsSignInEmail("preview"), false);
   for (const environment of ["production", "preview"]) {
-    await sendSignInEmail(
-      "test-only-key",
-      email,
-      environment,
-      async (_url, options) => {
-        const body = JSON.parse(String(options?.body));
-        assert.equal(body.subject, "123456 is your sign-in code");
-        assert.ok(body.text.includes(`Sign in: ${email.url}`));
-        assert.match(body.text, /device that requested it: 123456/);
-        const escapedUrl = email.url.replaceAll("&", "&amp;");
-        assert.ok(body.html.includes(`href="${escapedUrl}"`));
-        assert.match(body.html, />Sign in<\/a>/);
-        assert.match(body.html, /font-size:24px[^>]*>123456<\/p>/);
-        for (const content of [body.text, body.html]) {
-          assert.ok(
-            content.includes(
-              "The code and link expire in 10 minutes and can only be used once.",
-            ),
-          );
-          assert.match(
-            content,
-            /If you did not request this, you can safely ignore this email/,
-          );
-        }
-        assert.doesNotMatch(body.text, /public branch preview/);
-        assert.equal(
-          body.from,
-          "After Hours Outreach <accounts@afterhoursoutreach.ca>",
+    const sender = emailSender((body) => {
+      assert.equal(body.subject, "123456 is your sign-in code");
+      const text = String(body.text);
+      const html = String(body.html);
+      assert.ok(text.includes(`Sign in: ${email.url}`));
+      assert.match(text, /device that requested it: 123456/);
+      const escapedUrl = email.url.replaceAll("&", "&amp;");
+      assert.ok(html.includes(`href="${escapedUrl}"`));
+      assert.match(html, />Sign in<\/a>/);
+      assert.match(html, /font-size:24px[^>]*>123456<\/p>/);
+      for (const content of [text, html]) {
+        assert.ok(
+          content.includes(
+            "The code and link expire in 10 minutes and can only be used once.",
+          ),
         );
-        return Response.json({ id: "email-id" });
-      },
-    );
+        assert.match(
+          content,
+          /If you did not request this, you can safely ignore this email/,
+        );
+      }
+      assert.doesNotMatch(text, /public branch preview/);
+      assert.deepEqual(body.from, {
+        name: "After Hours Outreach",
+        email: "accounts@afterhoursoutreach.ca",
+      });
+      assert.deepEqual(body.to, ["volunteer@example.org"]);
+    });
+    await sendSignInEmail(sender, email, environment);
+    assert.equal(sender.messages.length, 1);
   }
-  await assert.rejects(
-    () =>
-      sendSignInEmail(
-        "test-only-key",
-        email,
-        "production",
-        async () => new Response("private recipient details", { status: 403 }),
-      ),
-    (error: unknown) =>
-      error instanceof RequestError && !error.message.includes("private"),
-  );
+  for (const [code, status] of [
+    ["E_RECIPIENT_SUPPRESSED", 503],
+    ["E_INTERNAL_SERVER_ERROR", 503],
+    ["E_RATE_LIMIT_EXCEEDED", 429],
+  ] as const)
+    await assert.rejects(
+      () =>
+        sendSignInEmail(
+          emailSender(() => {
+            throw emailError(code);
+          }),
+          email,
+          "production",
+        ),
+      (error: unknown) =>
+        error instanceof RequestError &&
+        error.status === status &&
+        !error.message.includes("PRIVATE"),
+    );
 });
 
 test("sign-in HTML escapes the code and URL without changing the plain-text alternative", async () => {
   const code = `<123&"'>`;
   const url = `${origin}/volunteer/sign-in/complete#email=test&value="'<tag>`;
+  const sender = emailSender((body) => {
+    const html = String(body.html);
+    const text = String(body.text);
+    const escapedUrl = `${origin}/volunteer/sign-in/complete#email=test&amp;value=&quot;&#39;&lt;tag&gt;`;
+    assert.equal(html.split(`href="${escapedUrl}"`).length - 1, 1);
+    assert.ok(html.includes("&lt;123&amp;&quot;&#39;&gt;"));
+    assert.ok(!html.includes(code));
+    assert.ok(text.includes(url));
+    assert.ok(text.includes(code));
+  });
   await sendSignInEmail(
-    "test-only-key",
+    sender,
     { email: "volunteer@example.org", code, url, id: "escaped" },
     "production",
-    async (_url, options) => {
-      const body = JSON.parse(String(options?.body));
-      const escapedUrl = `${origin}/volunteer/sign-in/complete#email=test&amp;value=&quot;&#39;&lt;tag&gt;`;
-      assert.equal(body.html.split(`href="${escapedUrl}"`).length - 1, 1);
-      assert.ok(body.html.includes("&lt;123&amp;&quot;&#39;&gt;"));
-      assert.ok(!body.html.includes(code));
-      assert.ok(body.text.includes(url));
-      assert.ok(body.text.includes(code));
-      return Response.json({ id: "email-id" });
-    },
   );
+  assert.equal(sender.messages.length, 1);
 });
 
 test("email-change messages contain a verification code rather than a sign-in link", async () => {
+  const sender = emailSender((body) => {
+    const text = String(body.text);
+    const html = String(body.html);
+    assert.equal(body.subject, "123456 is your email change code");
+    assert.match(text, /account settings[\s\S]*123456/);
+    assert.doesNotMatch(text, /Sign in:|sign-in\/complete/);
+    assert.match(html, /123456/);
+    assert.doesNotMatch(html, /href=|sign-in\/complete/);
+  });
   await sendSignInEmail(
-    "test-only-key",
+    sender,
     {
       email: "new@example.org",
       code: "123456",
@@ -2742,30 +2782,21 @@ test("email-change messages contain a verification code rather than a sign-in li
       purpose: "change-email",
     },
     "production",
-    async (_url, options) => {
-      const body = JSON.parse(String(options?.body));
-      assert.equal(body.subject, "123456 is your email change code");
-      assert.match(body.text, /account settings[\s\S]*123456/);
-      assert.doesNotMatch(body.text, /Sign in:|sign-in\/complete/);
-      assert.match(body.html, /123456/);
-      assert.doesNotMatch(body.html, /href=|sign-in\/complete/);
-      return Response.json({ id: "email-id" });
-    },
   );
+  assert.equal(sender.messages.length, 1);
 });
 
-test("local email delivery never calls Resend, even with a configured key", async () => {
+test("local email delivery never sends, even with a configured binding", async () => {
   const email = {
     email: "local@example.org",
     code: "123456",
     url: "http://localhost:4321/volunteer/sign-in/complete#email=local%40example.org&otp=123456",
     id: "local-test",
   };
-  for (const key of [undefined, "test-only-key"]) {
-    const captured = await sendSignInEmail(key, email, "local", async () => {
-      assert.fail("Local email must not make any network request");
-    });
+  for (const sender of [undefined, emailSender()]) {
+    const captured = await sendSignInEmail(sender, email, "local");
     assert.deepEqual(captured, email);
+    assert.equal(sender?.send.mock.calls.length ?? 0, 0);
   }
 });
 

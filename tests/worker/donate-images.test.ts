@@ -10,7 +10,6 @@ test("donation images request bounded Shopify thumbnails without cropping", asyn
         vars: { APP_ENV: "production", AUTH_BASE_URL: origin },
         secrets: {
           BETTER_AUTH_SECRET: "donate-images-test-secret-12345678901234567890",
-          RESEND_API_KEY: "",
         },
       },
     ],

@@ -328,4 +328,44 @@ export class Cloudflare {
     });
     return data.data?.viewer.accounts[0]?.d1AnalyticsAdaptiveGroups ?? [];
   }
+
+  /** Account-wide Email Sending results for the 31 UTC dates GraphQL allows. */
+  async emailUsage() {
+    const day = 86_400_000;
+    const end = new Date().toISOString().slice(0, 10);
+    const start = new Date(Date.parse(end) - 30 * day)
+      .toISOString()
+      .slice(0, 10);
+    const data = await this.request<{
+      data?: {
+        viewer: {
+          accounts: {
+            emailSendingAdaptiveGroups: {
+              count: number;
+              dimensions: { date: string; status: string };
+            }[];
+          }[];
+        };
+      };
+    }>("/graphql", {
+      // Final events of new messages: one per sent message and recipient.
+      query: `query DashboardEmail($account: string!, $start: Date!, $end: Date!) {
+        viewer { accounts(filter: { accountTag: $account }) { emailSendingAdaptiveGroups(limit: 1000, filter: { date_geq: $start, date_leq: $end, eventType: "newEmailSending", isLastEvent: 1 }, orderBy: [date_ASC]) {
+          count dimensions { date status }
+        } } } }`,
+      variables: { account: this.accountId, start, end },
+    });
+    const groups =
+      data.data?.viewer.accounts[0]?.emailSendingAdaptiveGroups ?? [];
+    const statuses: Record<string, number> = {};
+    let today = 0;
+    let total = 0;
+    for (const { count, dimensions } of groups) {
+      total += count;
+      if (dimensions.date === end) today += count;
+      statuses[dimensions.status || "unknown"] =
+        (statuses[dimensions.status || "unknown"] ?? 0) + count;
+    }
+    return { start, end, today, total, statuses, loadedAt: Date.now() };
+  }
 }

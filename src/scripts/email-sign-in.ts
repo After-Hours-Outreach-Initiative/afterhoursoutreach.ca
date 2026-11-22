@@ -202,15 +202,18 @@ export function initEmailSignIn(finish: (result: object) => void) {
           "success",
         );
       update();
-      if (import.meta.env.DEV && result.localEmail) {
+      if (
+        (import.meta.env.DEV || import.meta.env.MODE === "preview") &&
+        result.localEmail
+      ) {
         const { localEmailDialog } =
           await import("../dev/scripts/local-email-dialog");
         const outcome = await localEmailDialog({
-          title: "Local sign-in email",
+          title: `${import.meta.env.DEV ? "Local" : "Preview"} sign-in email`,
           emails: [
             {
               to: result.localEmail.email,
-              subject: "Your local sign-in code",
+              subject: "Your sign-in code",
               body: `Your code is ${result.localEmail.code}. The code and link expire in ten minutes; using either invalidates both. A new email replaces the previous code.`,
               href: result.localEmail.url,
             },

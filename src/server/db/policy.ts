@@ -173,8 +173,12 @@ export function canViewVolunteerProfile(actor: {
 }
 
 export const emailPolicy = {
-  // Sign-in, event, certification, and submission mail share a budget below 100/day.
-  dailyLimit: 80,
+  // Sign-in, event, certification, and submission mail share one budget. The
+  // rolling cap keeps any Cloudflare billing month (at most 31 days, so at most
+  // 32 UTC days) within the 3,000 emails included with Workers Paid.
+  dailyLimit: 200,
+  rollingLimit: 3000,
+  rollingWindows: 32,
   budgetWindowMs: 24 * 60 * 60 * 1000,
   timeoutMs: 10 * 1000,
 };

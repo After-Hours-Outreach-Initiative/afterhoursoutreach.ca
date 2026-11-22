@@ -23,7 +23,9 @@ have development-only simulations accessible through the normal user flow so
 success, cancellation, pending, and failure states can be previewed without real
 credentials or provider calls. Email is the exception: local delivery shows the
 message and always succeeds, with no outcome to choose. Exclude simulation code
-and bypasses from hosted production and preview builds.
+and bypasses from hosted production and preview builds, except that hosted
+previews show sign-in emails the same way as local development instead of
+sending them.
 
 ## Cloudflare tooling
 

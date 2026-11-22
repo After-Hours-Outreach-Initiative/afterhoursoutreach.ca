@@ -1,6 +1,6 @@
 ---
 title: Dashboard administration
-description: Use the local operations dashboard to administer D1 application data and monitor delivery, usage, and Resend limits.
+description: Use the local operations dashboard to administer D1 application data and monitor delivery, usage, and email sending.
 ---
 
 Open the [Operations dashboard](/dashboard/) in the local documentation site.
@@ -23,8 +23,8 @@ The Cloudflare account defaults to `account_id` in `wrangler.jsonc`.
 
 For narrowly scoped automation credentials, D1 discovery/inspection requires
 **D1 Read**; mutations require **D1 Write** (or the corresponding current D1
-product role). D1 analytics additionally needs **Account Analytics Read**. If
-analytics permission is missing, the other sections remain usable. Never paste
+product role). D1 and email analytics additionally need **Account Analytics
+Read**. If analytics permission is missing, the other sections remain usable. Never paste
 credential values into chat, source files or a SQL command.
 
 The selector discovers databases in the configured account. To use another
@@ -32,23 +32,13 @@ account accessible to your credentials, set `DOCS_DASHBOARD_ACCOUNT_ID` in
 `docs/.env.local`, restart the docs server, then reconnect. This setting changes
 only the dashboard, not application bindings or deployments.
 
-## Resend limits
+## Email sending
 
-Copy `docs/.env.example` to **`docs/.env.local`**, then enter your dedicated
-full-access Resend key as `DOCS_DASHBOARD_RESEND_API_KEY`. The file is Git-ignored
-and blocked from Vite's filesystem server. Do not prefix the variable with
-`PUBLIC_`, reuse the application's send-only key, or commit the value.
-
-The Email and jobs section reads Resend's documented `GET /usage` endpoint to
-show daily/monthly email quota, contacts, domains and API rate limits. Results
-are cached for one minute. The dashboard reloads this variable when reading
-usage, so adding a key needs only a refresh; after replacing a configured key,
-wait for the one-minute cache or restart the docs server.
-
-Limits apply to the **whole Resend account/team**, not the selected D1 database.
-Unlimited quotas are displayed as “No cap”; reset dates come from Resend. The
-full-access key stays server-side. Despite its provider permissions, this
-dashboard exposes **no sending, retrying, key-management or Resend write API**.
+The Email and jobs section reads Cloudflare's Email Sending analytics for the
+last 31 UTC dates, the most GraphQL allows. It shows emails sent today against
+the application's 200-a-day cap, the 31-day total against 3,000, and final
+delivery statuses. Counts are account-wide, can lag, and are cached for one
+minute. The dashboard cannot send or retry mail.
 
 ## Database selection and write protection
 
@@ -149,7 +139,7 @@ inspection. Application-specific controls are disabled; there is no attempt to
 guess user tables or mutate unrelated applications.
 
 Refresh is manual by default. Optional one-minute refresh pauses while the tab
-is hidden, a review is open, or a form control has focus. Resend/D1 usage reads
+is hidden, a review is open, or a form control has focus. Email/D1 usage reads
 are cached for a minute. Dashboard reads contribute to D1 usage.
 
 ## Safety and operational limits

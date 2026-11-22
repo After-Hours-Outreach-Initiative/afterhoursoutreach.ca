@@ -4,23 +4,21 @@ import { signInDestination } from "@/data/account-navigation";
 import SecondFactorForm from "./SecondFactorForm.astro";
 import EmailCodeForm from "./EmailCodeForm.astro";
 import FieldError from "@/components/FieldError.astro";
-const localTesting = Boolean(import.meta.env.DEV);
-const ready = Boolean(
-  env.BETTER_AUTH_SECRET && (localTesting || env.RESEND_API_KEY),
-);
+// Local development and previews show sign-in emails instead of sending them.
+const shownEmail =
+  Boolean(import.meta.env.DEV) || import.meta.env.MODE === "preview";
+const ready = Boolean(env.BETTER_AUTH_SECRET && (shownEmail || env.EMAIL));
 ---
 
 <section class="volunteer-panel volunteer-signin-panel" id="volunteer-signin">
   <h2>Sign in or Create an account</h2>
   <p>You'll need an account to volunteer with us.</p>
   <p>You must be at least 19 years old to apply.</p>
-  {
-    !ready && (
-      <p class="volunteer-notice" role="status">
-        Sign-in is not configured yet. Please check back later.
-      </p>
-    )
-  }
+  {!ready && (
+    <p class="volunteer-notice" role="status">
+      Sign-in is not configured yet. Please check back later.
+    </p>
+  )}
   <form
     data-email-request
     data-return-to={signInDestination}
@@ -51,11 +49,14 @@ const ready = Boolean(
           data-remembered-emails
           role="group"
           aria-labelledby="sign-in-history-label"
+        ></div>
+        <button
+          type="button"
+          class="volunteer-signin-forget"
+          data-forget-emails
         >
-        </div>
-        <button type="button" class="volunteer-signin-forget" data-forget-emails
-          >Forget saved emails</button
-        >
+          Forget saved emails
+        </button>
       </div>
     </div>
     <p data-form-message role="status" aria-live="polite" hidden></p>
@@ -63,8 +64,10 @@ const ready = Boolean(
       type="submit"
       class="btn btn-primary"
       data-loading-label="Sending email…"
-      disabled={!ready}>Continue with Email</button
+      disabled={!ready}
     >
+      Continue with Email
+    </button>
   </form>
   <EmailCodeForm />
   <SecondFactorForm />
@@ -72,7 +75,11 @@ const ready = Boolean(
     href="/volunteer/sign-in"
     class="volunteer-email-reset"
     data-use-different-email
-    hidden>Use a different email</a
+    hidden
   >
-  <noscript><p>JavaScript is required to sign in.</p></noscript>
+    Use a different email
+  </a>
+  <noscript>
+    <p>JavaScript is required to sign in.</p>
+  </noscript>
 </section>

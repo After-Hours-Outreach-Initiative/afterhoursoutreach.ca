@@ -106,7 +106,7 @@ exercises, or formal organizational/legal approvals. Confirm what has already
 been done and record the owner and evidence rather than marking all of it undone.
 
 The policy also records provider locations, tracking settings, and retention
-windows. This audit checked source, not live Cloudflare/Resend accounts or
+windows. This audit checked source, not live Cloudflare accounts or
 provider agreements. Keep the verification date and evidence for those claims
 and review them when deployment or provider settings change.
 

@@ -15,7 +15,7 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
       {
         configPath: "dist/server/wrangler.json",
         vars: { APP_ENV: "production", AUTH_BASE_URL: origin },
-        secrets: { BETTER_AUTH_SECRET: secret, RESEND_API_KEY: "" },
+        secrets: { BETTER_AUTH_SECRET: secret },
       },
     ],
   });

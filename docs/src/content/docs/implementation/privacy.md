@@ -90,7 +90,7 @@ The policy's organizer-only roster statement is therefore stale.
 
 ## Email and Discord data
 
-Hosted authentication and notification mail uses Resend; local development
+Hosted authentication and notification mail uses Cloudflare Email Service; local development
 simulates delivery. D1 stores delivery state and, where required, message payloads.
 The review-ready notification goes to three fixed organizer inboxes with a display
 name and organizer-authenticated review link rather than full answers. The current trigger is the winning Naloxone-confirmation transaction,

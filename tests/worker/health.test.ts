@@ -19,7 +19,6 @@ describe("database readiness in the built Worker", () => {
         vars: { APP_ENV: "production", AUTH_BASE_URL: "" },
         secrets: {
           BETTER_AUTH_SECRET: "health-test-secret-12345678901234567890",
-          RESEND_API_KEY: "",
         },
       },
     ],

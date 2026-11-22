@@ -3,8 +3,13 @@ import { afterEach, test, vi } from "vitest";
 import { env } from "cloudflare:workers";
 import type { AuthBindings } from "../src/server/auth";
 import { queueNotification } from "../src/server/db/notifications";
-import { hashAuthValue, takeEmailBudget } from "../src/server/db/rate-limits";
+import {
+  emailBudgetRemaining,
+  hashAuthValue,
+  takeEmailBudget,
+} from "../src/server/db/rate-limits";
 import { emailPolicy } from "../src/server/db/policy";
+import { emailError, emailSender } from "./helpers/email-sender";
 import {
   actionEmailResult,
   deliverNotifications,
@@ -39,12 +44,6 @@ async function queued(count: number) {
   );
   return { operation, userId };
 }
-const accepted: typeof fetch = async (_url, init) =>
-  Response.json({
-    data: JSON.parse(String(init?.body)).map((_: unknown, index: number) => ({
-      id: `accepted-${index}`,
-    })),
-  });
 async function budgetCount() {
   const start =
     Math.floor(Date.now() / emailPolicy.budgetWindowMs) *
@@ -59,36 +58,31 @@ async function budgetCount() {
       .first<number>("count")) ?? 0
   );
 }
+const { dailyLimit } = emailPolicy;
+const unavailable = {
+  EMAIL: undefined as unknown as SendEmail,
+};
 
-test("a successful batch sends more than five private messages in one bounded provider request", async () => {
+test("each private message is its own request and a repeat delivery sends nothing", async () => {
   const { operation } = await queued(12);
-  const provider = vi.fn<typeof fetch>(async (url, init) => {
-    assert.equal(url, "https://api.resend.com/emails/batch");
-    const payload = JSON.parse(String(init?.body));
-    assert.equal(payload.length, 12);
-    for (const email of payload) {
-      assert.equal(
-        email.from,
-        "After Hours Outreach <info@afterhoursoutreach.ca>",
-      );
-      assert.equal(email.to.length, 1);
-      assert.equal(email.cc, undefined);
-      assert.equal(email.bcc, undefined);
-      assert.ok(email.html.includes("<h1"));
-      assert.match(
-        email.html,
-        /href="https:\/\/afterhoursoutreach\.ca\/events"/,
-      );
-    }
-    assert.ok(init?.signal);
-    return accepted(url, init);
+  const provider = emailSender((email) => {
+    assert.deepEqual(email.from, {
+      name: "After Hours Outreach",
+      email: "info@afterhoursoutreach.ca",
+    });
+    assert.equal((email.to as string[]).length, 1);
+    assert.equal(email.cc, undefined);
+    assert.equal(email.bcc, undefined);
+    assert.ok(String(email.html).includes("<h1"));
+    assert.match(
+      String(email.html),
+      /href="https:\/\/afterhoursoutreach\.ca\/events"/,
+    );
   });
-  const timeout = vi.spyOn(AbortSignal, "timeout");
   const result = await deliverNotifications(bindings(), operation, provider);
   assert.equal(result.sent, 12);
   assert.equal(result.pending, 0);
-  assert.equal(provider.mock.calls.length, 1);
-  assert.equal(timeout.mock.calls[0][0], 10_000);
+  assert.equal(provider.messages.length, 12);
   assert.equal(await budgetCount(), 12);
   assert.equal(notificationNotice(result), "");
   const feedback = await actionEmailResult(
@@ -105,14 +99,14 @@ test("a successful batch sends more than five private messages in one bounded pr
   );
   assert.equal(empty.message, "Event saved.");
   await deliverNotifications(bindings(), operation, provider);
-  assert.equal(provider.mock.calls.length, 1);
+  assert.equal(provider.send.mock.calls.length, 12);
 });
 
-test("quota sends the available emails, counts messages rather than calls, and never drains unrelated pending mail", async () => {
+test("quota sends the available emails, counts messages, and never drains unrelated pending mail", async () => {
   const { operation } = await queued(12);
   const old = await queued(2);
-  await takeEmailBudget(env.DB, env.BETTER_AUTH_SECRET, 75);
-  const provider = vi.fn(accepted);
+  await takeEmailBudget(env.DB, env.BETTER_AUTH_SECRET, dailyLimit - 5);
+  const provider = emailSender();
   const result = await deliverNotifications(bindings(), operation, provider);
   assert.equal(result.sent, 5);
   assert.equal(result.pending, 7);
@@ -120,8 +114,8 @@ test("quota sends the available emails, counts messages rather than calls, and n
   assert.match(notificationNotice(result), /7 emails could not be sent/);
   assert.match(notificationNotice(result), /Retry email only/);
   assert.doesNotMatch(notificationNotice(result), /accepted|inbox delivery/);
-  assert.equal(await budgetCount(), 80);
-  assert.equal(provider.mock.calls.length, 1);
+  assert.equal(await budgetCount(), dailyLimit);
+  assert.equal(provider.send.mock.calls.length, 5);
   assert.equal(
     await env.DB.prepare(
       "SELECT sum(attempts) FROM event_notification WHERE operation_id=?",
@@ -130,21 +124,20 @@ test("quota sends the available emails, counts messages rather than calls, and n
       .first<number>("sum(attempts)"),
     0,
   );
-  // Idempotent retry never replays accepted mail, even if no quota remains.
   await deliverNotifications(bindings(), operation, provider);
-  assert.equal(provider.mock.calls.length, 1);
+  assert.equal(provider.send.mock.calls.length, 5);
   // Replenish only this scratch test counter, simulating the next budget window.
   await env.DB.prepare("UPDATE auth_rate_limit SET count=0").run();
   const retry = await deliverNotifications(bindings(), operation, provider);
   assert.equal(retry.sent, 12);
   assert.equal(retry.pending, 0);
   assert.equal(notificationNotice(retry), "");
-  assert.equal(JSON.parse(String(provider.mock.calls[1][1]?.body)).length, 7);
+  assert.equal(provider.send.mock.calls.length, 12);
   assert.equal(await budgetCount(), 7);
 });
 
 test("atomic reservations cannot overdraw the shared sign-in budget", async () => {
-  await takeEmailBudget(env.DB, env.BETTER_AUTH_SECRET, 77);
+  await takeEmailBudget(env.DB, env.BETTER_AUTH_SECRET, dailyLimit - 3);
   const results = await Promise.allSettled([
     takeEmailBudget(env.DB, env.BETTER_AUTH_SECRET, 2),
     takeEmailBudget(env.DB, env.BETTER_AUTH_SECRET, 2),
@@ -153,49 +146,66 @@ test("atomic reservations cannot overdraw the shared sign-in budget", async () =
     results.filter((result) => result.status === "fulfilled").length,
     1,
   );
-  assert.equal(await budgetCount(), 79);
+  assert.equal(await budgetCount(), dailyLimit - 1);
 });
 
-test("timeouts replay the exact frozen batch/key and recipients, without charging twice or repeating accepted messages", async () => {
-  const { operation, userId } = await queued(8);
-  const requests: { key: string | null; body: string }[] = [];
-  const capture = (init?: RequestInit) =>
-    requests.push({
-      key: new Headers(init?.headers).get("Idempotency-Key"),
-      body: String(init?.body),
-    });
+test("the rolling cap counts the previous 31 days and ignores older ones", async () => {
+  const { budgetWindowMs, rollingLimit, rollingWindows } = emailPolicy;
+  const today = Math.floor(Date.now() / budgetWindowMs) * budgetWindowMs;
+  const counter = async (daysAgo: number, count: number) =>
+    env.DB.prepare(
+      "INSERT INTO auth_rate_limit (key,count,expires_at) VALUES (?,?,?)",
+    )
+      .bind(
+        await hashAuthValue(
+          env.BETTER_AUTH_SECRET,
+          `rate:send-total:${budgetWindowMs}:${today - daysAgo * budgetWindowMs}`,
+        ),
+        count,
+        today + budgetWindowMs,
+      )
+      .run();
+  await counter(rollingWindows, rollingLimit);
+  await counter(rollingWindows - 1, rollingLimit - 2);
+  assert.equal(await emailBudgetRemaining(env.DB, env.BETTER_AUTH_SECRET), 2);
+  await takeEmailBudget(env.DB, env.BETTER_AUTH_SECRET, 2);
+  await assert.rejects(
+    takeEmailBudget(env.DB, env.BETTER_AUTH_SECRET),
+    /Too many requests/,
+  );
+  assert.equal(await budgetCount(), 2);
+});
+
+test("an email that may have been sent is cancelled for that recipient only and never resent", async () => {
+  const { operation, userId } = await queued(3);
+  let calls = 0;
   const first = await deliverNotifications(
     bindings(),
     operation,
-    async (_url, init) => {
-      capture(init);
-      throw new DOMException("Provider may have accepted this", "TimeoutError");
-    },
+    emailSender(() => {
+      if (++calls === 2) throw emailError("E_INTERNAL_SERVER_ERROR");
+    }),
   );
-  assert.equal(first.unconfirmed, 8);
-  assert.equal(first.failed, 0);
-  assert.match(notificationNotice(first), /unconfirmed delivery/);
-  // A later configuration/rejection/quota failure cannot turn an earlier
-  // ambiguous acceptance into a claim that the email definitely was not sent.
-  const unavailable = await deliverNotifications(
-    { ...bindings(), RESEND_API_KEY: "" },
+  assert.equal(first.sent, 1);
+  assert.equal(first.unconfirmed, 1);
+  assert.equal(first.pending, 1);
+  assert.doesNotMatch(JSON.stringify(first), /PRIVATE PROVIDER BODY/);
+  assert.match(notificationNotice(first), /1 email could not be sent/);
+  assert.match(
+    notificationNotice(first),
+    /1 email may not have arrived and will not be resent/,
+  );
+  // A later configuration failure cannot turn the unclear send into a retry.
+  const later = await deliverNotifications(
+    { ...bindings(), ...unavailable },
     operation,
-    accepted,
   );
-  assert.equal(unavailable.unconfirmed, 8);
-  assert.equal(unavailable.failed, 0);
+  assert.equal(later.unconfirmed, 1);
+  assert.equal(later.unavailable, true);
   await env.DB.prepare("UPDATE user SET email='changed@example.org' WHERE id=?")
     .bind(userId)
     .run();
-  await env.DB.prepare(
-    "UPDATE event_notification SET subject='mutated',body='mutated' WHERE operation_id=?",
-  )
-    .bind(operation)
-    .run();
-  const provider = vi.fn<typeof fetch>(async (url, init) => {
-    capture(init);
-    return accepted(url, init);
-  });
+  const provider = emailSender();
   await Promise.all([
     deliverNotifications(
       { ...bindings(), AUTH_BASE_URL: "https://another-preview.example.org" },
@@ -204,29 +214,28 @@ test("timeouts replay the exact frozen batch/key and recipients, without chargin
     ),
     deliverNotifications(bindings(), operation, provider),
   ]);
-  assert.equal(provider.mock.calls.length, 1);
-  assert.deepEqual(requests[0], requests[1]);
-  assert.equal(await budgetCount(), 8);
-  await deliverNotifications(bindings(), operation, provider);
-  assert.equal(provider.mock.calls.length, 1);
+  assert.equal(provider.send.mock.calls.length, 1);
+  assert.deepEqual(provider.messages[0].to, [`${userId}@example.org`]);
+  const done = await deliverNotifications(bindings(), operation, provider);
+  assert.equal(provider.send.mock.calls.length, 1);
+  assert.equal(done.sent, 2);
+  assert.equal(done.unconfirmed, 1);
+  assert.equal(done.pending, 0);
+  assert.equal(await budgetCount(), 3);
 });
 
-test("provider rejection, unknown acceptance and expiration are accurately distinguished", async () => {
+test("provider rejection is retryable and expiration is reported separately", async () => {
   const { operation } = await queued(6);
   const rejected = await deliverNotifications(
     bindings(),
     operation,
-    async () => new Response("private rejection reason", { status: 422 }),
+    emailSender(() => {
+      throw emailError("E_RECIPIENT_SUPPRESSED");
+    }),
   );
   assert.equal(rejected.failed, 6);
   assert.equal(rejected.unconfirmed, 0);
-  assert.doesNotMatch(JSON.stringify(rejected), /private rejection reason/);
-  const malformed = await deliverNotifications(
-    bindings(),
-    operation,
-    async () => Response.json({ data: [{ id: "only-one" }] }),
-  );
-  assert.equal(malformed.unconfirmed, 6);
+  assert.doesNotMatch(JSON.stringify(rejected), /PRIVATE PROVIDER BODY/);
   await env.DB.prepare(
     "UPDATE event_notification SET created_at=? WHERE operation_id=?",
   )
@@ -237,10 +246,10 @@ test("provider rejection, unknown acceptance and expiration are accurately disti
   )
     .bind(Date.now() - 24 * 3_600_000, operation)
     .run();
-  const provider = vi.fn(accepted);
+  const provider = emailSender();
   const expired = await deliverNotifications(bindings(), operation, provider);
   assert.equal(expired.expired, 6);
-  assert.equal(provider.mock.calls.length, 0);
+  assert.equal(provider.send.mock.calls.length, 0);
   assert.match(notificationNotice(expired), /no longer safe to retry/);
   assert.equal(
     await env.DB.prepare(
@@ -252,58 +261,47 @@ test("provider rejection, unknown acceptance and expiration are accurately disti
   );
 });
 
-test("a partial multi-batch failure retries only the unsuccessful batch; local simulation uses no quota", async () => {
+test("a partial failure retries only the unsent emails; local simulation uses no quota", async () => {
   // Local simulation can exceed the hosted daily budget without touching it.
-  const local = await queued(205);
-  const blocked = vi.fn<typeof fetch>(async () => {
-    throw new Error("Real email forbidden");
-  });
+  const local = await queued(dailyLimit + 5);
+  const blocked = emailSender();
   const simulated = await deliverNotifications(
     { ...bindings(), APP_ENV: "local" },
     local.operation,
     blocked,
   );
-  assert.equal(simulated.sent, 205);
-  assert.equal(simulated.simulated, 205);
+  assert.equal(simulated.sent, dailyLimit + 5);
+  assert.equal(simulated.simulated, dailyLimit + 5);
   assert.equal(notificationNotice(simulated), "");
-  assert.equal(blocked.mock.calls.length, 0);
+  assert.equal(blocked.send.mock.calls.length, 0);
   assert.equal(await budgetCount(), 0);
-  const sizes = (
-    await env.DB.prepare(
-      "SELECT payload FROM event_notification_batch WHERE operation_id=?",
-    )
-      .bind(local.operation)
-      .all<{ payload: string }>()
-  ).results
-    .map((row) => JSON.parse(row.payload).length)
-    .sort((a, b) => a - b);
-  assert.deepEqual(sizes, [5, 100, 100]);
 
   const { operation } = await queued(4);
-  await takeEmailBudget(env.DB, env.BETTER_AUTH_SECRET, 78);
-  const provider = vi.fn(accepted);
-  await deliverNotifications(bindings(), operation, provider); // 2 accepted, 2 quota-blocked.
+  await takeEmailBudget(env.DB, env.BETTER_AUTH_SECRET, dailyLimit - 2);
+  const provider = emailSender();
+  await deliverNotifications(bindings(), operation, provider); // 2 sent, 2 quota-blocked.
   await env.DB.prepare("UPDATE auth_rate_limit SET count=0").run();
   const rejected = await deliverNotifications(
     bindings(),
     operation,
-    async () => new Response("", { status: 400 }),
+    emailSender(() => {
+      throw emailError("E_VALIDATION_ERROR");
+    }),
   );
   assert.equal(rejected.sent, 2);
   assert.equal(rejected.failed, 2);
   const retry = await deliverNotifications(bindings(), operation, provider);
   assert.equal(retry.sent, 4);
-  assert.equal(provider.mock.calls.length, 2);
-  assert.notEqual(
-    provider.mock.calls[0][1]?.body,
-    provider.mock.calls[1][1]?.body,
+  assert.equal(
+    new Set(provider.messages.map((email) => email.subject)).size,
+    4,
   );
 });
 
 test("an email/storage failure never changes a successful mutation into a save failure", async () => {
   const { operation } = await queued(1);
   const result = await actionEmailResult(
-    { ...bindings(), RESEND_API_KEY: "" },
+    { ...bindings(), ...unavailable },
     { operation, message: "Event saved." },
     true,
   );
@@ -324,36 +322,35 @@ test("an email/storage failure never changes a successful mutation into a save f
   assert.equal(failure.retryOperation, operation);
 });
 
-test("legacy pending records are retained, never regrouped under new batch idempotency", async () => {
+test("legacy pending records are retained, never regrouped", async () => {
   const { operation } = await queued(1);
   await env.DB.prepare(
     "UPDATE event_notification SET delivery_to=NULL,attempts=1,delivery_origin=? WHERE operation_id=?",
   )
     .bind("https://original.example.org", operation)
     .run();
-  const provider = vi.fn(accepted);
+  const provider = emailSender();
   const result = await deliverNotifications(bindings(), operation, provider);
   assert.equal(result.expired, 1);
-  assert.equal(provider.mock.calls.length, 0);
+  assert.equal(provider.send.mock.calls.length, 0);
 });
 
-test("an aborted provider request reports unconfirmed delivery and stops further requests", async () => {
-  const { operation } = await queued(7);
-  const controller = new AbortController();
-  vi.spyOn(AbortSignal, "timeout").mockReturnValue(controller.signal);
-  const provider = vi.fn<typeof fetch>(async (_url, init) => {
-    assert.equal(init?.signal, controller.signal);
-    controller.abort(new DOMException("Timed out", "TimeoutError"));
-    throw controller.signal.reason;
-  });
-  const result = await deliverNotifications(bindings(), operation, provider);
-  assert.equal(provider.mock.calls.length, 1);
-  assert.equal(result.unconfirmed, 7);
-  assert.equal(result.failed, 0);
-  assert.match(notificationNotice(result), /unconfirmed delivery/);
+test("a send that times out is unconfirmed and stops further sends", async () => {
+  const { operation } = await queued(4);
+  const timeout = emailPolicy.timeoutMs;
+  emailPolicy.timeoutMs = 50;
+  try {
+    const provider = emailSender(() => new Promise(() => {}));
+    const result = await deliverNotifications(bindings(), operation, provider);
+    assert.equal(provider.send.mock.calls.length, 1);
+    assert.equal(result.unconfirmed, 1);
+    assert.equal(result.pending, 3);
+  } finally {
+    emailPolicy.timeoutMs = timeout;
+  }
 });
 
-test("an accepted request with a failed ledger write recovers using its original batch/key", async () => {
+test("an accepted email whose ledger write failed is never resent", async () => {
   const { operation } = await queued(3);
   const realBatch = env.DB.batch.bind(env.DB);
   let writes = 0;
@@ -364,7 +361,7 @@ test("an accepted request with a failed ledger write recovers using its original
         throw new Error("Ledger unavailable after provider acceptance");
       return realBatch(statements);
     });
-  const provider = vi.fn(accepted);
+  const provider = emailSender();
   await assert.rejects(
     deliverNotifications(bindings(), operation, provider),
     /Ledger unavailable/,
@@ -376,15 +373,8 @@ test("an accepted request with a failed ledger write recovers using its original
     .bind(operation)
     .run();
   const result = await deliverNotifications(bindings(), operation, provider);
-  assert.equal(result.sent, 3);
-  assert.equal(provider.mock.calls.length, 2);
-  assert.equal(
-    provider.mock.calls[0][1]?.body,
-    provider.mock.calls[1][1]?.body,
-  );
-  assert.equal(
-    new Headers(provider.mock.calls[0][1]?.headers).get("Idempotency-Key"),
-    new Headers(provider.mock.calls[1][1]?.headers).get("Idempotency-Key"),
-  );
+  assert.equal(result.sent, 2);
+  assert.equal(result.unconfirmed, 1);
+  assert.equal(provider.send.mock.calls.length, 3);
   assert.equal(await budgetCount(), 3);
 });

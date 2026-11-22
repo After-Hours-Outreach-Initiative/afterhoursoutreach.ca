@@ -35,7 +35,7 @@ export default function localDashboard(): AstroIntegration {
         const sessions = new Sessions();
         const log = new ActivityLog(root);
         const writing = new Set<string>();
-        let resendCache: { expires: number; value: unknown } | undefined;
+        let emailCache: { expires: number; value: unknown } | undefined;
         const metricCache = new Map<
           string,
           { expires: number; value: unknown }
@@ -92,53 +92,12 @@ export default function localDashboard(): AstroIntegration {
                     url.searchParams.get("refresh") === "1",
                   ),
                 });
-              if (route === "resend") {
-                if (resendCache && resendCache.expires > Date.now())
-                  return respond(res, 200, resendCache.value);
-                // Only this dashboard-specific key is read. Never fall back to the
-                // application's send key, and never expose a provider proxy.
-                const env = await dashboardEnvironment(docsRoot);
-                const key = env.DOCS_DASHBOARD_RESEND_API_KEY;
-                if (!key) return respond(res, 200, { configured: false });
-                const response = await fetch("https://api.resend.com/usage", {
-                  headers: {
-                    Authorization: `Bearer ${key}`,
-                    "User-Agent": "AfterHoursOutreach-LocalDashboard/1.0",
-                  },
-                  signal: AbortSignal.timeout(15_000),
-                  redirect: "error",
-                });
-                if (!response.ok)
-                  throw new DashboardError(
-                    502,
-                    `resend_${response.status}`,
-                    `Resend usage is unavailable (${response.status}). Check the dashboard-only key has full access; no email has been sent.`,
-                  );
-                const data = await response.json();
-                const usage = Object.fromEntries(
-                  [
-                    "emails",
-                    "contacts",
-                    "segments",
-                    "broadcasts",
-                    "ai_credits",
-                    "automation_runs",
-                    "domains",
-                    "rate_limit",
-                  ]
-                    .filter((key) => data[key] !== undefined)
-                    .map((key) => [key, data[key]]),
-                );
-                const value = {
-                  configured: true,
-                  usage,
-                  loadedAt: Date.now(),
-                  rateLimitRemaining: response.headers.get(
-                    "ratelimit-remaining",
-                  ),
-                  rateLimitReset: response.headers.get("ratelimit-reset"),
-                };
-                resendCache = { value, expires: Date.now() + 60_000 };
+              if (route === "email") {
+                if (emailCache && emailCache.expires > Date.now())
+                  return respond(res, 200, emailCache.value);
+                // Read-only analytics: the dashboard never sends or retries mail.
+                const value = await cf.emailUsage();
+                emailCache = { value, expires: Date.now() + 60_000 };
                 return respond(res, 200, value);
               }
               databaseId = url.searchParams.get("database") ?? "";

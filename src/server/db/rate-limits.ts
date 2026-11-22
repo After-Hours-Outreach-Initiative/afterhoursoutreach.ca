@@ -80,22 +80,60 @@ export async function limitEmailRequests(
   if (consumeProviderBudget) await takeEmailBudget(binding, secret);
 }
 
+/** Today's counter key plus the keys of every window in the rolling cap. */
+export async function emailBudgetKeys(secret: string | undefined, now: number) {
+  const { budgetWindowMs, rollingWindows } = emailPolicy;
+  const start = Math.floor(now / budgetWindowMs) * budgetWindowMs;
+  const keys = await Promise.all(
+    Array.from({ length: rollingWindows }, (_, index) =>
+      hashAuthValue(
+        secret,
+        `rate:send-total:${budgetWindowMs}:${start - index * budgetWindowMs}`,
+      ),
+    ),
+  );
+  return {
+    start,
+    key: keys[0],
+    recent: JSON.stringify(keys),
+    // Daily counters must outlive the rolling window that sums them.
+    expiresAt: start + rollingWindows * budgetWindowMs,
+  };
+}
+
+/**
+ * Atomically reserve `count` emails when `guard` holds and both the daily and
+ * rolling caps allow it. Binds: key, count, expiresAt, ...guardBindings,
+ * count, recent, rollingLimit, dailyLimit.
+ */
+export function emailBudgetSql(guard = "1") {
+  return `INSERT INTO auth_rate_limit (key, count, expires_at)
+    SELECT ?, ?, ? WHERE ${guard} AND ? + coalesce((SELECT sum(count) FROM auth_rate_limit
+      WHERE key IN (SELECT value FROM json_each(?))), 0) <= ?
+    ON CONFLICT (key) DO UPDATE SET count = count + excluded.count
+      WHERE count + excluded.count <= ?`;
+}
+
 export async function emailBudgetRemaining(
   binding: Env["DB"],
   secret: string | undefined,
 ) {
-  const start =
-    Math.floor(Date.now() / emailPolicy.budgetWindowMs) *
-    emailPolicy.budgetWindowMs;
-  const key = await hashAuthValue(
-    secret,
-    `rate:send-total:${emailPolicy.budgetWindowMs}:${start}`,
+  const { key, recent } = await emailBudgetKeys(secret, Date.now());
+  const row = await binding
+    .prepare(
+      `SELECT coalesce((SELECT count FROM auth_rate_limit WHERE key = ?), 0) AS today,
+        coalesce((SELECT sum(count) FROM auth_rate_limit
+          WHERE key IN (SELECT value FROM json_each(?))), 0) AS recent`,
+    )
+    .bind(key, recent)
+    .first<{ today: number; recent: number }>();
+  return Math.max(
+    0,
+    Math.min(
+      emailPolicy.dailyLimit - (row?.today ?? 0),
+      emailPolicy.rollingLimit - (row?.recent ?? 0),
+    ),
   );
-  const count = await binding
-    .prepare("SELECT count FROM auth_rate_limit WHERE key=?")
-    .bind(key)
-    .first<number>("count");
-  return Math.max(0, emailPolicy.dailyLimit - (count ?? 0));
 }
 
 export async function takeEmailBudget(
@@ -105,27 +143,24 @@ export async function takeEmailBudget(
 ) {
   if (!Number.isInteger(count) || count < 1 || count > emailPolicy.dailyLimit)
     throw new RangeError("Invalid email budget count.");
-  const start =
-    Math.floor(Date.now() / emailPolicy.budgetWindowMs) *
-    emailPolicy.budgetWindowMs;
-  const key = await hashAuthValue(
+  const { start, key, recent, expiresAt } = await emailBudgetKeys(
     secret,
-    `rate:send-total:${emailPolicy.budgetWindowMs}:${start}`,
+    Date.now(),
   );
-  const row = await binding
-    .prepare(
-      `INSERT INTO auth_rate_limit (key, count, expires_at) VALUES (?, ?, ?)
-    ON CONFLICT (key) DO UPDATE SET count = count + excluded.count WHERE count + excluded.count <= ?
-    RETURNING count`,
-    )
+  const result = await binding
+    .prepare(emailBudgetSql())
     .bind(
       key,
       count,
-      start + emailPolicy.budgetWindowMs,
+      expiresAt,
+      count,
+      recent,
+      emailPolicy.rollingLimit,
       emailPolicy.dailyLimit,
     )
-    .first();
-  if (!row) throw new RequestError(429, "Too many requests. Try again later.");
+    .run();
+  if (!result.meta.changes)
+    throw new RequestError(429, "Too many requests. Try again later.");
   return start;
 }
 

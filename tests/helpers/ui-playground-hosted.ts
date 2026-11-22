@@ -9,7 +9,7 @@ export async function assertHostedUiPlaygroundAbsent(configPath: string) {
         configPath,
         vars: { AUTH_BASE_URL: origin },
         // Disable authentication: no credentials, sessions, or migrations needed.
-        secrets: { BETTER_AUTH_SECRET: "", RESEND_API_KEY: "" },
+        secrets: { BETTER_AUTH_SECRET: "" },
       },
     ],
   });

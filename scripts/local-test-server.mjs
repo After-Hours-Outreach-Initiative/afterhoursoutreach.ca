@@ -134,7 +134,7 @@ export async function startLocalTestServer(logs, { signal } = {}) {
     }
     await writeFile(
       join(directory, ".dev.vars"),
-      `APP_ENV="local"\nAUTH_BASE_URL=""\nBETTER_AUTH_SECRET="${randomBytes(32).toString("hex")}"\nRESEND_API_KEY="ui-tests-local-no-email"\n`,
+      `APP_ENV="local"\nAUTH_BASE_URL=""\nBETTER_AUTH_SECRET="${randomBytes(32).toString("hex")}"\n`,
       { mode: 0o600 },
     );
     const migrated = await command(

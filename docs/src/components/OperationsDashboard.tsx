@@ -34,22 +34,16 @@ interface ApiOptions {
   signal?: AbortSignal;
 }
 type Api = <T>(route: string, options?: ApiOptions) => Promise<T>;
-interface ResendUsage {
-  configured: boolean;
-  loadedAt?: number;
-  usage?: {
-    emails?: { daily?: Quota; monthly?: Quota };
-    rate_limit?: { limit: number; duration: string };
-    contacts?: Quota;
-    domains?: Quota;
-  };
-  rateLimitRemaining?: string | null;
+interface EmailUsage {
+  start: string;
+  end: string;
+  today: number;
+  total: number;
+  statuses: Record<string, number>;
+  loadedAt: number;
 }
-interface Quota {
-  used: number;
-  limit: number | null;
-  resets_at?: string;
-}
+// The application's own caps, from emailPolicy in src/server/db/policy.ts.
+const emailCaps = { daily: 200, rolling: 3000 };
 
 function RefreshIcon() {
   return (
@@ -648,12 +642,12 @@ function Email({
   api: Api;
   refresh: number;
 }) {
-  const [data, setData] = useState<ResendUsage>();
+  const [data, setData] = useState<EmailUsage>();
   const [error, setError] = useState("");
   useEffect(() => {
     const controller = new AbortController();
     setError("");
-    void api<ResendUsage>("resend", { signal: controller.signal })
+    void api<EmailUsage>("email", { signal: controller.signal })
       .then(setData)
       .catch((error) => {
         if (!controller.signal.aborted) setError(errorMessage(error));
@@ -664,66 +658,52 @@ function Email({
     <section aria-labelledby="ops-email-heading">
       <h2 id="ops-email-heading">Email and background jobs</h2>
       <div className="ops-panel">
-        <h3>Resend account limits</h3>
+        <h3>Cloudflare email sending</h3>
         <p className="ops-muted">
-          Account-wide, across all databases and applications. This dashboard
-          only reads usage; it cannot send mail or change Resend settings.
-          Results are cached for one minute.
+          Account-wide, across all databases and applications, from Cloudflare
+          analytics, which can lag. Workers Paid includes 3,000 emails a month.
+          This dashboard only reads usage. Results are cached for one minute.
         </p>
         {error && (
           <p className="ops-notice ops-danger" role="alert">
             {error}
           </p>
         )}
-        {!data && !error && <p role="status">Loading Resend limits…</p>}
-        {data && !data.configured && (
-          <p className="ops-notice">
-            Add <code>DOCS_DASHBOARD_RESEND_API_KEY</code> to{" "}
-            <code>docs/.env.local</code> with your dashboard-only full-access
-            Resend key, then refresh. Never use a <code>PUBLIC_</code> variable
-            or commit the key.
-          </p>
-        )}
-        {data?.configured && (
+        {!data && !error && <p role="status">Loading email usage…</p>}
+        {data && (
           <>
             <div className="ops-grid">
               {(
                 [
-                  ["Daily email", data.usage?.emails?.daily],
-                  ["Monthly email", data.usage?.emails?.monthly],
-                  ["Contacts", data.usage?.contacts],
-                  ["Domains", data.usage?.domains],
-                ] as [string, Quota | undefined][]
-              ).map(
-                ([label, quota]) =>
-                  quota && (
-                    <div key={label}>
-                      <h4>{label}</h4>
-                      <p>
-                        <strong>{number(quota.used)}</strong> /{" "}
-                        {quota.limit === null ? "No cap" : number(quota.limit)}
-                      </p>
-                      {quota.limit !== null && quota.limit > 0 && (
-                        <progress
-                          aria-label={`${label} quota used`}
-                          value={quota.used}
-                          max={quota.limit}
-                        />
-                      )}
-                      {quota.resets_at && (
-                        <p className="ops-muted">
-                          Resets {date(quota.resets_at)}
-                        </p>
-                      )}
-                    </div>
-                  ),
-              )}
+                  ["Today (UTC)", data.today, emailCaps.daily],
+                  [
+                    `${data.start} to ${data.end} (UTC)`,
+                    data.total,
+                    emailCaps.rolling,
+                  ],
+                ] as const
+              ).map(([label, used, limit]) => (
+                <div key={label}>
+                  <h4>{label}</h4>
+                  <p>
+                    <strong>{number(used)}</strong> / {number(limit)}
+                  </p>
+                  <progress
+                    aria-label={`${label} emails sent`}
+                    value={Math.min(used, limit)}
+                    max={limit}
+                  />
+                </div>
+              ))}
             </div>
-            <p className="ops-muted">
-              API rate limit: {number(data.usage?.rate_limit?.limit)} requests /{" "}
-              {data.usage?.rate_limit?.duration ?? "—"}. Retrieved{" "}
-              {date(data.loadedAt)}.
-            </p>
+            <div className="ops-buttons">
+              {Object.entries(data.statuses).map(([status, count]) => (
+                <span className="ops-chip" key={status}>
+                  {status}: {number(count)}
+                </span>
+              ))}
+            </div>
+            <p className="ops-muted">Retrieved {date(data.loadedAt)}.</p>
           </>
         )}
       </div>
@@ -1308,7 +1288,7 @@ export default function OperationsDashboard() {
                       organizer interface.
                     </p>
                     <p>
-                      Resend limits are account-wide. Delivery ledgers show
+                      Email usage is account-wide. Delivery ledgers show
                       queued jobs, not proof that the scheduled Worker is
                       running.
                     </p>

@@ -14,7 +14,7 @@ database bindings.
 <Diagram
   name="system-overview"
   title="System overview"
-  description="Builds from the afterhoursoutreach.ca GitHub repository deploy production and the current branch preview under one Cloudflare Worker. Previews use a shared preview D1 database. Production D1 is not yet provisioned. The application uses Resend for email."
+  description="Builds from the afterhoursoutreach.ca GitHub repository deploy production and the current branch preview under one Cloudflare Worker. Previews use a shared preview D1 database. Production D1 is not yet provisioned. The application uses Cloudflare Email Service for email."
 />
 
 Production serves `afterhoursoutreach.ca`; each preview has its own `workers.dev`
@@ -49,7 +49,7 @@ supported; GitHub is not involved in serving browser requests.
 | Environment       | Runtime                                                                    | Database                                                                        | Email and scheduled work                                                                            |
 | ----------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
 | Local development | Astro dev server with local Workers simulation                             | Persistent local D1 under `.wrangler/state/`; remote bindings disabled          | Simulated email dialogs; medic reminder jobs skipped                                                |
-| Branch previews   | Previews under `afterhoursoutreach-ca`, each with its own URL and settings | Shared `afterhoursoutreach-staging` D1 by default                               | Real, rate-limited Resend delivery for sign-in and opted-in event mail; medic reminder jobs skipped |
+| Branch previews   | Previews under `afterhoursoutreach-ca`, each with its own URL and settings | Shared `afterhoursoutreach-staging` D1 by default                               | No email binding: sign-in emails shown on screen, other mail not sent; medic reminder jobs skipped |
 | Production        | `afterhoursoutreach-ca` serving `afterhoursoutreach.ca`                    | Dedicated production D1 **not yet provisioned**; checked-in ID is a placeholder | Real delivery and production-only reminder processing require completed production configuration    |
 
 Preview bindings do not grant automatic database isolation. Two branches using
@@ -69,7 +69,7 @@ libraries and modules in the same application, not extra deployed services.
 <Diagram
   name="request-handling"
   title="Application request handling"
-  description="Browser requests enter the Worker fetch handler, then Astro pages and API endpoints. Better Auth handles authentication, domain workflows handle accounts and events, and both use the database layer and email delivery modules. D1 and Resend are external services."
+  description="Browser requests enter the Worker fetch handler, then Astro pages and API endpoints. Better Auth handles authentication, domain workflows handle accounts and events, and both use the database layer and email delivery modules. D1 and Cloudflare Email Service are external services."
 />
 
 - **Astro** renders application pages on the server and routes HTTP API requests
@@ -83,10 +83,10 @@ libraries and modules in the same application, not extra deployed services.
   such as event capacity.
 - **D1** holds application records, sessions, rate limits, notification outboxes,
   and delivery leases. The browser never connects to D1 directly.
-- **Resend** delivers sign-in and opted-in notifications in deployed environments.
+- **Cloudflare Email Service** delivers sign-in and opted-in notifications in production.
   Notifications are recorded with the originating change before delivery is
   attempted, so an email failure does not undo the saved change. Local development
-  uses simulated delivery instead of contacting Resend.
+  and previews use simulated delivery instead of sending.
 
 See [Backend](/implementation/backend/), [Accounts](/specification/accounts/), and [Events](/specification/events/) for the
 detailed behavior and access rules.
@@ -100,12 +100,12 @@ requires the pending production D1 and other launch prerequisites.
 <Diagram
   name="scheduled-reminders"
   title="Production medic certification reminders"
-  description="Cloudflare Cron Triggers invoke the same Worker's scheduled handler. Medic reminder processing checks eligibility and persistent delivery state in production D1, then sends bounded email batches through Resend. Production D1 remains pending; preview and local environments skip this processing."
+  description="Cloudflare Cron Triggers invoke the same Worker's scheduled handler. Medic reminder processing checks eligibility and persistent delivery state in production D1, then sends bounded email batches through Cloudflare Email Service. Production D1 remains pending; preview and local environments skip this processing."
 />
 
 Daily discovery runs at **16:00 UTC**; delivery and retries run at **30 minutes
 past each hour**. D1 tracks eligibility, outbox state, and atomic delivery leases;
-stable Resend idempotency keys protect retries from duplicate sends.
+an unconfirmed send is never retried, so retries cannot send duplicates.
 
 This is not a general event-email dispatcher. Event notification delivery/retries
 remain request- or organizer-triggered. Local development and `APP_ENV !=

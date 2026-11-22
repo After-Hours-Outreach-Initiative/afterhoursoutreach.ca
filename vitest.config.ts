@@ -41,7 +41,6 @@ export default defineConfig({
                 AUTH_BASE_URL: "https://afterhoursoutreach.ca",
                 BETTER_AUTH_SECRET:
                   "vitest-only-auth-secret-12345678901234567890",
-                RESEND_API_KEY: "test-only-resend-key",
               },
             },
           }),
