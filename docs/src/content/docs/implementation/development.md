@@ -8,6 +8,10 @@ Use these tools to exercise the [account](/specification/accounts/) and
 
 ## Run the application
 
+Use Node.js 24.22.2 (see `.node-version`) and pnpm 11.9.0. Current timezone data
+keeps Vancouver event times consistent with the Workers runtime after B.C.'s
+2026 move to permanent UTC−7. Install dependencies with `pnpm install`.
+
 Configure a local `BETTER_AUTH_SECRET` of at least 32 characters in
 `.dev.vars`, then start `pnpm dev`. It applies local migrations, starts the
 background server, and seeds the sample accounts and events the first time. No extra
@@ -132,6 +136,45 @@ These controls and local email dialogs are excluded
 from public builds. Worker previews still use preview D1 and real,
 rate-limited email delivery. Accounts and events are always included in production
 builds; deployment readiness is controlled by the developer, not a feature flag.
+
+## UI playground
+
+Run `pnpm dev`, then open <http://localhost:4321/dev/ui> or choose **UI playground**
+in the local **DEV panel** (Alt+Z), available on every page, including the
+playground. Account controls load only when the panel is opened.
+
+Choose a website part from the playground navigation:
+
+- **Applications table** (`/dev/ui/applications`): try application progress states,
+  approval filters, instant local search, empty results, long names, and 500-entry directories.
+- **Volunteers table** (`/dev/ui/volunteers`): inspect roles, avatars, patrol access,
+  and ascending/descending sorting on all three columns. Both table playgrounds
+  include viewport sizes and delayed, failed, or paused search/sort responses.
+- **Organizer profile**: inspect application review, rejection, orientation,
+  volunteer/medic access, organizer roles, and historical records. Preview
+  the profile page at different sizes, try long or sparse answers, and
+  simulate loading, failed saves, conflicts, pending actions, and email failures.
+- **Discord connection**: browse the state gallery or try fictional inputs,
+  delayed responses, and success/error flows. Developer controls simulate
+  background updates without adding a refresh button to the actual component.
+
+The previews use the website's real view components. Viewport settings and scenario URLs
+can be bookmarked or shared locally; reset restores the selected fictional state.
+The playground simulations need no sign-in and never change accounts, write to
+the database, or call Discord. The shared DEV panel still provides its usual
+local account controls. Playground routes and simulations are excluded from both
+production and hosted preview builds. Add future component examples under
+`src/dev/ui/`.
+
+## Home-screen icons
+
+iOS uses `public/apple-touch-icon.png`; Android uses the regular and maskable
+icons declared in `public/site.webmanifest`. The shared site layout links both.
+
+To change the home-screen artwork, replace `public/icons/app-icon.svg` with a
+square SVG and run `pnpm icons:generate`. Commit the generated PNGs alongside
+the source. Keep the artwork centered with padding so Android's icon masks
+don't crop it. Browser favicons are managed separately.
 
 ## Excluding development tools from hosted builds
 

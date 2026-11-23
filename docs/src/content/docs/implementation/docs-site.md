@@ -23,7 +23,8 @@ pnpm docs:dev
 ```
 
 Open [http://127.0.0.1:4322](http://127.0.0.1:4322). The documentation server runs in
-the background, binds only to loopback, and fails if port 4322 is already in use
+the background, independently of the application server on port 4321, binds only
+to loopback, and fails if port 4322 is already in use
 instead of choosing another port.
 
 Manage the documentation server from the repository root:
@@ -100,7 +101,8 @@ in the body. Use lowercase, hyphen-separated filenames and keep routes
 based on the folder and filename, without custom `slug` frontmatter:
 `specification/accounts.mdx` becomes `/specification/accounts/`, each section's
 `index.md` becomes its landing page, and the root `index.mdx` is the overview at `/`. Link to reader routes
-such as `[Accounts](/specification/accounts/)`, not `.md` source paths. Add new guides to the
+such as `[Accounts](/specification/accounts/)`, not `.md` source paths, and use
+explicit repository links for source files outside the documentation site. Add new guides to the
 explicit sidebar in `docs/astro.config.mjs`, then run `pnpm docs:check`.
 
 After changing the site configuration, restart the reader with `pnpm docs:stop`
