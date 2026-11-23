@@ -73,6 +73,10 @@ Existing test accounts in your development database are not deleted.
 
 Playwright arguments are forwarded normally:
 
+The [test scenarios and edge cases](/implementation/test-scenarios/) describe
+the manual and automated checks that should accompany changes to accounts,
+events, notifications, and privacy-sensitive flows.
+
 ```sh
 pnpm test:ui tests/ui/local-accounts.spec.ts
 pnpm test:ui --grep "application"
