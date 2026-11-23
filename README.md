@@ -71,13 +71,12 @@ application secrets.
 | `pnpm docs:logs`   | Read its logs.                   |
 | `pnpm docs:check`  | Validate the documentation site. |
 
-The reader separates [Planning](docs/src/content/docs/planning/index.md),
-[Specification](docs/src/content/docs/specification/index.md), and
-[Implementation](docs/src/content/docs/implementation/index.md). Planning has
-[TODO](docs/src/content/docs/planning/todo.md) for ready work and
-[TBD](docs/src/content/docs/planning/tbd.md) for ideas and open decisions. Move items
-from TBD to TODO once ready. Specifications record agreed behavior; implementation
-guides explain the code and operations.
+The reader separates [Specification](docs/src/content/docs/specification/index.md)
+and [Implementation](docs/src/content/docs/implementation/index.md). Work is
+tracked in [GitHub issues](https://github.com/After-Hours-Outreach-Initiative/afterhoursoutreach.ca/issues): issues labeled
+`needs thought` need a decision first, and every other open issue is ready. Remove
+the label once an item is ready. Specifications record agreed behavior;
+implementation guides explain the code and operations.
 
 Edit Markdown in [docs/src/content/docs/](docs/src/content/docs/); changes appear
 live in the browser. Each page has `title` and `description` frontmatter; Starlight

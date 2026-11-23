@@ -76,5 +76,5 @@ dependent on the configuration described in
   retry window requires manual follow-up.
 
 Local development and hosted branch previews do not send these reminders.
-Certificate verification, uploads, and hours tracking remain separate
-[planning questions](/planning/#applications-and-qualifications).
+Certificate verification and uploads ([#56](https://github.com/After-Hours-Outreach-Initiative/afterhoursoutreach.ca/issues/56)) and hours tracking
+([#57](https://github.com/After-Hours-Outreach-Initiative/afterhoursoutreach.ca/issues/57)) are separate open questions.

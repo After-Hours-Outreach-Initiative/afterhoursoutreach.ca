@@ -72,8 +72,9 @@ export default defineConfig({
         {
           label: "Planning",
           items: [
-            { label: "TODO", slug: "planning/todo" },
-            { label: "TBD", slug: "planning/tbd" },
+            { label: "Ready", link: "https://github.com/After-Hours-Outreach-Initiative/afterhoursoutreach.ca/issues?q=is%3Aopen+is%3Aissue+-label%3A%22needs+thought%22" },
+            { label: "Needs thought", link: "https://github.com/After-Hours-Outreach-Initiative/afterhoursoutreach.ca/issues?q=is%3Aopen+is%3Aissue+label%3A%22needs+thought%22" },
+            { label: "Privacy", slug: "planning/privacy" },
           ],
         },
         {

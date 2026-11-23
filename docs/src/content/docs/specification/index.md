@@ -8,7 +8,7 @@ Outreach activities. Organizers review applications, manage access, and coordina
 patrols and orientations.
 
 This section records the product baseline from the existing workflow guides.
-Unresolved ideas remain in [Planning](/planning/). Agreed additions that are not
+Unresolved ideas remain in [GitHub issues](https://github.com/After-Hours-Outreach-Initiative/afterhoursoutreach.ca/issues?q=is%3Aopen+is%3Aissue+label%3A%22needs+thought%22). Agreed additions that are not
 built must be marked **Planned**, with a link to their implementation status.
 Configuration and deployment readiness are documented in
 [Implementation](/implementation/).

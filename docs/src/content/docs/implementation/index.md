@@ -5,7 +5,7 @@ description: Architecture, development, integrations, deployment, and verificati
 
 These guides explain how the [product specification](/specification/) is built
 and operated. Product rules live in the specification; proposals and unresolved
-decisions live in [Planning](/planning/).
+decisions live in [GitHub issues](https://github.com/After-Hours-Outreach-Initiative/afterhoursoutreach.ca/issues).
 
 ## Architecture and data
 

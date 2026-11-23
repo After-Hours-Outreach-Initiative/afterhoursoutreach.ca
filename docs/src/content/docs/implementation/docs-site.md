@@ -69,13 +69,13 @@ the reader's three main sections:
 
 | Folder            | Purpose                                                        |
 | ----------------- | -------------------------------------------------------------- |
-| `planning/`       | TODO for ready work; TBD for ideas and open decisions. |
+| `planning/`       | Privacy planning. Other work is in GitHub issues.             |
 | `specification/`  | Agreed workflows, permissions, and product behavior.           |
 | `implementation/` | Architecture, code, integrations, development, and operations. |
 
 Keep requirements in Specification and link to them from plans and implementation
 guides. Mark agreed but unbuilt behavior as **Planned**. Keep ideas awaiting a
-decision in [TBD](/planning/tbd/) and move them to [TODO](/planning/todo/) when ready.
+decision in [GitHub issues](https://github.com/After-Hours-Outreach-Initiative/afterhoursoutreach.ca/issues?q=is%3Aopen+is%3Aissue+label%3A%22needs+thought%22) labeled `needs thought`.
 
 Edit the Markdown or MDX files in these folders directly. The local reader
 updates as you save changes.
